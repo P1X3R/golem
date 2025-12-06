@@ -17,15 +17,15 @@ typedef uint16_t move_t;
 typedef uint8_t square_t;
 typedef uint64_t bitboard_t;
 typedef enum {
-  PAWN,
-  KNIGHT,
-  BISHOP,
-  ROOK,
-  QUEEN,
-  KING,
-  NONE,
+  PT_PAWN,
+  PT_KNIGHT,
+  PT_BISHOP,
+  PT_ROOK,
+  PT_QUEEN,
+  PT_KING,
+  PT_NONE,
 } piece_t;
-typedef enum { WHITE = 0, BLACK = 1 } color_t;
+typedef enum { CLR_WHITE = 0, CLR_BLACK = 1 } color_t;
 typedef struct {
   uint64_t magic;
   bitboard_t mask;
@@ -34,10 +34,10 @@ typedef struct {
 } magic_t;
 
 enum {
-  WK = 1 << 0,
-  WQ = 1 << 1,
-  BK = 1 << 2,
-  BQ = 1 << 3,
+  RT_WK = 1 << 0,
+  RT_WQ = 1 << 1,
+  RT_BK = 1 << 2,
+  RT_BQ = 1 << 3,
 };
 enum {
   R1 = 0x00000000000000FFULL,

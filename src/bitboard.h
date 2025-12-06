@@ -17,8 +17,11 @@ square_t FORCE_INLINE pop_lsb(bitboard_t* __restrict bits) {
   return sq;
 }
 int8_t FORCE_INLINE get_pawn_direction(const color_t color) {
-  return (color == WHITE) ? 8 : -8;
+  return (color == CLR_WHITE) ? 8 : -8;
 }
 bool FORCE_INLINE is_valid_coord(const int rank, const int file) {
   return rank >= 0 && rank < NR_OF_ROWS && file >= 0 && file < NR_OF_ROWS;
+}
+bitboard_t FORCE_INLINE get_adjacent(const bitboard_t target) {
+  return ((target & ~FH) << 1) | ((target & ~FA) >> 1);
 }
