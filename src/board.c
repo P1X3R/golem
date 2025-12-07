@@ -9,6 +9,7 @@
 
 #include "bitboard.h"
 #include "defs.h"
+#include "movegen.h"
 #include "zobrist.h"
 
 static void FORCE_INLINE set_piece(board_t* board, const square_t sq,
@@ -192,4 +193,78 @@ board_t from_fen(char fen[]) {
   }
 
   return board;
+}
+
+bool FORCE_INLINE is_square_attacked(const square_t sq,
+                                     const color_t attacker_color,
+                                     const board_t* board,
+                                     const bitboard_t occupancy) {
+  const bitboard_t attackers = board->occupancies[attacker_color];
+
+  // Pawn attacks (reverse color direction)
+  if (gen_piece_attacks(PT_PAWN, attacker_color ^ 1, occupancy, sq) &
+      (board->bitboards[PT_PAWN] & attackers)) {
+    return true;
+  }
+
+  // Knight attacks
+  if (gen_piece_attacks(PT_KNIGHT, attacker_color, occupancy, sq) &
+      (board->bitboards[PT_KNIGHT] & attackers)) {
+    return true;
+  }
+
+  // Bishop / Queen attacks
+  if (gen_piece_attacks(PT_BISHOP, attacker_color, occupancy, sq) &
+      ((board->bitboards[PT_BISHOP] | board->bitboards[PT_QUEEN]) &
+       attackers)) {
+    return true;
+  }
+
+  // Rook / Queen attacks
+  if (gen_piece_attacks(PT_ROOK, attacker_color, occupancy, sq) &
+      ((board->bitboards[PT_ROOK] | board->bitboards[PT_QUEEN]) & attackers)) {
+    return true;
+  }
+
+  // King attacks
+  if (gen_piece_attacks(PT_KING, attacker_color, occupancy, sq) &
+      (board->bitboards[PT_KING] & attackers)) {
+    return true;
+  }
+
+  return false;
+}
+
+static const square_t CASTLE_PATHS[NR_OF_COLORS][NR_OF_CASTLING_SIDES][3] = {
+    // White
+    {
+        {SQ_E1, SQ_F1, SQ_G1},  // King-side
+        {SQ_E1, SQ_D1, SQ_C1},  // Queen-side
+    },
+    // Black
+    {
+        {SQ_E8, SQ_F8, SQ_G8},  // King-side
+        {SQ_E8, SQ_D8, SQ_C8},  // Queen-side
+    },
+};
+
+bool was_legal(const move_t move, const board_t* board) {
+  const color_t enemy = board->side_to_move ^ 1;
+
+  if (is_castling(move)) {
+    const uint8_t flags = get_flags(move);
+    const uint8_t side = (flags == FLAG_KING_SIDE) ? 0 : 1;
+
+    for (uint8_t i = 0; i < 3; i++) {
+      if (is_square_attacked(CASTLE_PATHS[board->side_to_move][side][i], enemy,
+                             board, board->occupancy)) {
+        return false;
+      }
+    }
+
+    return true;
+  }
+
+  return !is_square_attacked(board->kings[board->side_to_move], enemy, board,
+                             board->occupancy);
 }

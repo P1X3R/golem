@@ -13,6 +13,7 @@
 #define NR_OF_ROWS 8
 #define NR_OF_COLORS 2
 #define NR_OF_PIECE_TYPES 6
+#define NR_OF_CASTLING_SIDES 2
 
 #define MAX_MOVES 255
 
@@ -100,6 +101,9 @@ move_t FORCE_INLINE new_move(const square_t from, const square_t to,
 uint8_t FORCE_INLINE get_from(const move_t move) { return move & 0x3f; }
 uint8_t FORCE_INLINE get_to(const move_t move) { return (move >> 6) & 0x3f; }
 uint8_t FORCE_INLINE get_flags(const move_t move) { return move >> 12; }
+bool FORCE_INLINE is_castling(const move_t move) {
+  return (get_flags(move) & ~1) == 2;
+}
 
 void FORCE_INLINE push_move(move_list_t* move_list, const move_t move) {
   assert(move_list->len < MAX_MOVES);

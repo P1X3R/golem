@@ -18,4 +18,8 @@ typedef struct {
   color_t side_to_move;
 } board_t;
 
+bool FORCE_INLINE is_square_attakced(square_t sq, color_t attacker_color,
+                                     const board_t* board,
+                                     const bitboard_t occupancy);
 board_t from_fen(char fen[]);
+bool was_legal(move_t move, const board_t* board);
