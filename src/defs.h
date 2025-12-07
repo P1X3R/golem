@@ -1,5 +1,6 @@
 #pragma once
 
+#include <assert.h>
 #include <stdint.h>
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -12,6 +13,8 @@
 #define NR_OF_ROWS 8
 #define NR_OF_COLORS 2
 #define NR_OF_PIECE_TYPES 6
+
+#define MAX_MOVES 255
 
 typedef uint16_t move_t;
 typedef uint8_t square_t;
@@ -32,6 +35,10 @@ typedef struct {
   uint32_t offset;
   uint8_t shift;
 } magic_t;
+typedef struct {
+  move_t moves[MAX_MOVES];
+  uint8_t len;
+} move_list_t;
 
 enum {
   RT_WK = 1 << 0,
@@ -73,7 +80,35 @@ enum {
     SQ_NONE = 65
 };
 // clang-format on
+enum {
+  FLAG_QUIET = 0b0000,
+  FLAG_DOUBLE_PUSH = 0b0001,
+  FLAG_KING_SIDE = 0b0010,
+  FLAG_QUEEN_SIDE = 0b0011,
+  FLAG_CAPTURE = 0b0100,
+  FLAG_EP = 0b0101,
+  FLAG_PROMOTION = 0b1000,
+};
 
+move_t FORCE_INLINE new_move(const square_t from, const square_t to,
+                             const uint8_t flags) {
+  assert(from <= SQ_H8);
+  assert(to <= SQ_H8);
+  assert(flags <= 0xF);  // flags should be only 4-bits
+  return from | (to << 6) | (flags << 12);
+}
 uint8_t FORCE_INLINE get_from(const move_t move) { return move & 0x3f; }
 uint8_t FORCE_INLINE get_to(const move_t move) { return (move >> 6) & 0x3f; }
 uint8_t FORCE_INLINE get_flags(const move_t move) { return move >> 12; }
+
+void FORCE_INLINE push_move(move_list_t* move_list, const move_t move) {
+  assert(move_list->len < MAX_MOVES);
+  move_list->moves[move_list->len++] = move;
+}
+
+uint8_t FORCE_INLINE encode_promotion(const piece_t promoted) {
+  return FLAG_PROMOTION | (promoted - 1);
+}
+piece_t FORCE_INLINE decode_promotion(const uint8_t flags) {
+  return (piece_t)((0b11 & flags) + 1);
+}

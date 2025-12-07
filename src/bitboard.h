@@ -11,7 +11,7 @@ square_t FORCE_INLINE to_square(const int rank, const int file) {
 }
 uint8_t FORCE_INLINE get_rank(const square_t sq) { return sq >> 3; }
 uint8_t FORCE_INLINE get_file(const square_t sq) { return sq & 7; }
-square_t FORCE_INLINE pop_lsb(bitboard_t* __restrict bits) {
+square_t FORCE_INLINE pop_lsb(bitboard_t* bits) {
   const square_t sq = __builtin_ctzll(*bits);
   *bits &= *bits - 1;
   return sq;

@@ -1,5 +1,6 @@
 #include "board.h"
 
+#include <assert.h>
 #include <ctype.h>
 #include <stdbool.h>
 #include <stdint.h>
@@ -10,7 +11,7 @@
 #include "defs.h"
 #include "zobrist.h"
 
-static void FORCE_INLINE set_piece(board_t* __restrict board, const square_t sq,
+static void FORCE_INLINE set_piece(board_t* board, const square_t sq,
                                    const piece_t piece, const color_t color) {
   const bitboard_t placed = bit(sq);
 
@@ -64,24 +65,30 @@ static piece_t FORCE_INLINE char_to_piece(const char c) {
   }
 }
 
-board_t from_fen(char fen[], const size_t len) {
+board_t from_fen(char fen[]) {
   board_t board = empty_board();
+  char* token;
 
   /*
    * --- Piece placement ---
    */
-  char* placement = strtok(fen, " ");
-  square_t sq = SQ_A8;
+  token = strtok(fen, " ");
+  if (token == NULL) {
+    return board;
+  }
 
-  for (char* current = placement; *current; current++) {
+  uint8_t rank = 7, file = 0;
+  for (char* current = token; *current; current++) {
     const char c = *current;
 
     if (c == '/') {
-      sq = (sq & ~7) - 8;  // Move to A-file of next rank down
+      rank -= 1;
+      file = 0;
     } else if (c >= '1' && c <= '8') {
-      sq += c - '0';
+      file += c - '0';
     } else if (strchr("pnbrqkPNBRQK", c) != NULL) {
-      set_piece(&board, sq++, char_to_piece((char)tolower(c)),
+      set_piece(&board, to_square(rank, file++),
+                char_to_piece((char)tolower((unsigned char)c)),
                 isupper(c) ? CLR_WHITE : CLR_BLACK);
     }
   }
@@ -91,8 +98,12 @@ board_t from_fen(char fen[], const size_t len) {
   /*
    * --- Side to move ---
    */
-  char* side_to_move = strtok(fen, " ");
-  switch (side_to_move[0]) {
+  token = strtok(NULL, " ");
+  if (token == NULL) {
+    return board;
+  }
+
+  switch (token[0]) {
     case 'w':
       board.side_to_move = CLR_WHITE;
       break;
@@ -108,8 +119,12 @@ board_t from_fen(char fen[], const size_t len) {
   /*
    * --- Castling rights ---
    */
-  char* castling_rights = strtok(fen, " ");
-  for (char* current = castling_rights; *current; current++) {
+  token = strtok(NULL, " ");
+  if (token == NULL) {
+    return board;
+  }
+
+  for (char* current = token; *current; current++) {
     switch (*current) {
       case 'K':
         board.rights |= RT_WK;
@@ -132,10 +147,14 @@ board_t from_fen(char fen[], const size_t len) {
   /*
    * --- En passant ---
    */
-  char* ep_square = strtok(fen, " ");
-  if (strlen(ep_square) >= 2) {
-    char ep_file_char = ep_square[0];
-    char ep_rank_char = ep_square[1];
+  token = strtok(NULL, " ");
+  if (token == NULL) {
+    return board;
+  }
+
+  if (strlen(token) >= 2) {
+    char ep_file_char = token[0];
+    char ep_rank_char = token[1];
     const char valid_ep_rank = (board.side_to_move == CLR_WHITE) ? '6' : '3';
 
     if (ep_file_char >= 'a' && ep_file_char <= 'h' &&
@@ -148,8 +167,8 @@ board_t from_fen(char fen[], const size_t len) {
       const bitboard_t friendly_pawns =
           board.bitboards[PT_PAWN] & board.occupancies[board.side_to_move];
       const bool is_capturable = board.mailbox[target] == PT_NONE &&
-                                 captured_pawn & enemy_pawns &&
-                                 get_adjacent(captured_pawn) & friendly_pawns;
+                                 (captured_pawn & enemy_pawns) &&
+                                 (get_adjacent(captured_pawn) & friendly_pawns);
 
       if (is_capturable) {
         board.ep_target = target;
@@ -161,10 +180,14 @@ board_t from_fen(char fen[], const size_t len) {
   /*
    * --- Halfmove clock ---
    */
-  char* clock = strtok(fen, " ");
+  token = strtok(NULL, " ");
+  if (token == NULL) {
+    return board;
+  }
+
   char* endptr;
-  board.halfmove_clock = strtoul(clock, &endptr, 10);
-  if (endptr == clock || *endptr != '\0') {
+  board.halfmove_clock = strtoul(token, &endptr, 10);
+  if (endptr == token || *endptr != '\0') {
     board.halfmove_clock = 0;
   }
 

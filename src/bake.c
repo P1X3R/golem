@@ -150,8 +150,8 @@ uint64_t FORCE_INLINE fewbits() {
   return random_u64() & random_u64() & random_u64();
 }
 
-uint64_t find_magics(const square_t sq, const bitboard_t mask,
-                     bitboard_t* __restrict used, const deltas_t deltas) {
+uint64_t find_magics(const square_t sq, const bitboard_t mask, bitboard_t* used,
+                     const deltas_t deltas) {
   const uint8_t bits = __builtin_popcountll(mask);
   const uint16_t len = 1U << bits;
 

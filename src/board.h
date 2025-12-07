@@ -18,4 +18,4 @@ typedef struct {
   color_t side_to_move;
 } board_t;
 
-board_t from_fen(char fen[], size_t len);
+board_t from_fen(char fen[]);
