@@ -3,6 +3,7 @@
 #include <stdint.h>
 
 #include "bitboard.h"
+#include "board.h"
 #include "defs.h"
 
 static void FORCE_INLINE splat_moves(const square_t from, bitboard_t moves,
@@ -48,10 +49,11 @@ void gen_pawn_pushes(const board_t* __restrict board, const bitboard_t mask,
       board->bitboards[PT_PAWN] & board->occupancies[color];
   const bitboard_t single_pushes =
       (color == CLR_WHITE) ? (pawns << 8) & empty : (pawns >> 8) & empty;
-  const int8_t down = (int8_t)-get_pawn_direction(color);
+  const int8_t down = get_pawn_direction(color ^ 1);
+  const bitboard_t promotion_rank = (color == CLR_WHITE) ? R8 : R1;
   bitboard_t double_pushes = (color == CLR_WHITE)
-                                 ? (single_pushes << 8) & empty
-                                 : (single_pushes >> 8) & empty;
+                                 ? (single_pushes << 8) & empty & R4
+                                 : (single_pushes >> 8) & empty & R5;
   bitboard_t promotion_pushes =
       (color == CLR_WHITE) ? single_pushes & R8 : single_pushes & R1;
   bitboard_t quiet_pushes = single_pushes ^ promotion_pushes;
@@ -69,30 +71,42 @@ void gen_pawn_captures(const board_t* __restrict board, const bitboard_t mask,
       board->bitboards[PT_PAWN] & board->occupancies[color];
   const bitboard_t enemy = board->occupancies[color ^ 1];
   const bitboard_t promo_rank = (color == CLR_WHITE) ? R8 : R1;
-  const int8_t push = get_pawn_direction(color);
+  const int8_t push = get_pawn_direction(color ^ 1);
 
-  const int8_t left_capture_direction = (int8_t)(-push + 1);
+  const int8_t left_capture_direction = (int8_t)(push + 1);
   const bitboard_t left_captures = (color == CLR_WHITE)
                                        ? ((pawns & ~FA) << 7) & enemy
                                        : ((pawns & ~FA) >> 9) & enemy;
   bitboard_t left_captures_promo = left_captures & promo_rank;
   bitboard_t left_captures_no_promo = left_captures ^ left_captures_promo;
 
-  const int8_t right_capture_direction = (int8_t)(-push - 1);
+  const int8_t right_capture_direction = (int8_t)(push - 1);
   const bitboard_t right_captures = (color == CLR_WHITE)
                                         ? ((pawns & ~FH) << 9) & enemy
                                         : ((pawns & ~FH) >> 7) & enemy;
   bitboard_t right_captures_promo = right_captures & promo_rank;
   bitboard_t right_captures_no_promo = right_captures ^ right_captures_promo;
 
-  splat_promotion_moves(left_capture_direction, left_captures_promo,
+  splat_promotion_moves(left_capture_direction, left_captures_promo & mask,
                         FLAG_CAPTURE, move_list);
-  splat_promotion_moves(right_capture_direction, right_captures_promo,
+  splat_promotion_moves(right_capture_direction, right_captures_promo & mask,
                         FLAG_CAPTURE, move_list);
-  splat_pawn_moves(left_capture_direction, left_captures_no_promo, FLAG_CAPTURE,
-                   move_list);
-  splat_pawn_moves(right_capture_direction, right_captures_no_promo,
+  splat_pawn_moves(left_capture_direction, left_captures_no_promo & mask,
                    FLAG_CAPTURE, move_list);
+  splat_pawn_moves(right_capture_direction, right_captures_no_promo & mask,
+                   FLAG_CAPTURE, move_list);
+
+  if (board->ep_target == SQ_NONE) {
+    return;
+  }
+
+  bitboard_t attackers = gen_piece_attacks(PT_PAWN, color ^ 1, board->occupancy,
+                                           board->ep_target) &
+                         pawns;
+  while (attackers) {
+    push_move(move_list,
+              new_move(pop_lsb(&attackers), board->ep_target, FLAG_EP));
+  }
 }
 
 static void gen_castling(const board_t* __restrict board,
