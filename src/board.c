@@ -20,10 +20,16 @@ static void FORCE_INLINE set_piece(board_t* board, const square_t sq,
   board->bitboards[piece] |= placed;
   board->occupancies[color] |= placed;
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
+}
 
-  if (piece == PT_KING) {
-    board->kings[color] = sq;
-  }
+static void FORCE_INLINE clear_piece(board_t* board, const square_t sq,
+                                     const piece_t piece, const color_t color) {
+  const bitboard_t placed = bit(sq);
+
+  board->mailbox[sq] = PT_NONE;
+  board->bitboards[piece] ^= placed;
+  board->occupancies[color] ^= placed;
+  board->zobrist ^= ZOBRIST_PIECES[piece][sq];
 }
 
 static board_t FORCE_INLINE empty_board() {
@@ -88,9 +94,14 @@ board_t from_fen(char fen[]) {
     } else if (c >= '1' && c <= '8') {
       file += c - '0';
     } else if (strchr("pnbrqkPNBRQK", c) != NULL) {
-      set_piece(&board, to_square(rank, file++),
-                char_to_piece((char)tolower((unsigned char)c)),
-                isupper(c) ? CLR_WHITE : CLR_BLACK);
+      const piece_t piece = char_to_piece((char)tolower((unsigned char)c));
+      const square_t sq = to_square(rank, file++);
+      const color_t color = isupper(c) ? CLR_WHITE : CLR_BLACK;
+
+      set_piece(&board, sq, piece, color);
+      if (piece == PT_KING) {
+        board.kings[color] = sq;
+      }
     }
   }
 
@@ -249,15 +260,16 @@ static const square_t CASTLE_PATHS[NR_OF_COLORS][NR_OF_CASTLING_SIDES][3] = {
 };
 
 bool was_legal(const move_t move, const board_t* board) {
-  const color_t enemy = board->side_to_move ^ 1;
+  const color_t us = board->side_to_move ^ 1;
+  const color_t enemy = board->side_to_move;
 
   if (is_castling(move)) {
     const uint8_t flags = get_flags(move);
     const uint8_t side = (flags == FLAG_KING_SIDE) ? 0 : 1;
 
     for (uint8_t i = 0; i < 3; i++) {
-      if (is_square_attacked(CASTLE_PATHS[board->side_to_move][side][i], enemy,
-                             board, board->occupancy)) {
+      if (is_square_attacked(CASTLE_PATHS[us][side][i], enemy, board,
+                             board->occupancy)) {
         return false;
       }
     }
@@ -265,6 +277,103 @@ bool was_legal(const move_t move, const board_t* board) {
     return true;
   }
 
-  return !is_square_attacked(board->kings[board->side_to_move], enemy, board,
-                             board->occupancy);
+  return !is_square_attacked(board->kings[us], enemy, board, board->occupancy);
+}
+
+static uint8_t FORCE_INLINE rook_to_right(const square_t sq) {
+  switch (sq) {
+    case SQ_A1:
+      return RT_WQ;
+    case SQ_A8:
+      return RT_BQ;
+    case SQ_H1:
+      return RT_WK;
+    case SQ_H8:
+      return RT_BK;
+    default:
+      return 0;
+  }
+}
+
+undo_t do_move(const move_t move, board_t* board) {
+  const color_t color = board->side_to_move;
+  const color_t enemy = color ^ 1;
+  const square_t from = get_from(move), to = get_to(move);
+  const uint8_t flags = get_flags(move);
+  const piece_t initial = board->mailbox[from];
+  const piece_t final =
+      (flags & FLAG_PROMOTION) ? decode_promotion(flags) : initial;
+  const piece_t captured =
+      board->mailbox[to];  // En passant captures are handled later
+
+  const undo_t old = {board->zobrist, board->rights, board->ep_target,
+                      board->halfmove_clock, captured};
+
+  assert(captured != PT_KING);
+  assert(initial != PT_NONE);
+
+  clear_piece(board, from, initial, color);
+
+  if (flags == FLAG_EP) {
+    const square_t captured_pawn = to_square(get_rank(from), get_file(to));
+    clear_piece(board, captured_pawn, PT_PAWN, color ^ 1);
+  } else if (flags & FLAG_CAPTURE) {
+    board->bitboards[captured] ^= bit(to);
+    board->occupancies[enemy] ^= bit(to);
+    board->zobrist ^= ZOBRIST_PIECES[captured][to];
+  }
+
+  if (is_castling(move)) {
+    square_t rook_from = (flags == FLAG_KING_SIDE) ? SQ_H1 : SQ_A1;
+    square_t rook_to = (flags == FLAG_KING_SIDE) ? SQ_F1 : SQ_D1;
+    if (color == CLR_BLACK) {
+      rook_from += SQ_A8, rook_to += SQ_A8;
+    }
+
+    clear_piece(board, rook_from, PT_ROOK, color);
+    set_piece(board, rook_to, PT_ROOK, color);
+  }
+
+  set_piece(board, to, final, color);
+
+  board->occupancy =
+      board->occupancies[CLR_WHITE] | board->occupancies[CLR_BLACK];
+
+  board->zobrist ^= ZOBRIST_CASTLING_RIGHTS[board->rights];
+  if (initial == PT_KING) {
+    board->kings[color] = to;
+    const uint8_t right_mask =
+        (color == CLR_WHITE) ? (RT_BK | RT_BQ) : (RT_WK | RT_WQ);
+    board->rights &= right_mask;
+  } else if (initial == PT_ROOK) {
+    board->rights &= ~rook_to_right(from);
+  } else if (captured == PT_ROOK) {
+    board->rights &= ~rook_to_right(to);
+  }
+  board->zobrist ^= ZOBRIST_CASTLING_RIGHTS[board->rights];
+
+  board->halfmove_clock++;
+  if ((flags & FLAG_CAPTURE) || initial == PT_PAWN) {
+    board->halfmove_clock = 0;
+  }
+
+  if (board->ep_target != SQ_NONE) {
+    board->zobrist ^= ZOBRIST_EP_FILE[get_file(board->ep_target)];
+    board->ep_target = SQ_NONE;
+  }
+  if (flags == FLAG_DOUBLE_PUSH) {
+    const bitboard_t enemy_pawns =
+        board->bitboards[PT_PAWN] & board->occupancies[enemy];
+    const bool is_capturable = get_adjacent(bit(to)) & enemy_pawns;
+
+    if (is_capturable) {
+      board->ep_target = to + get_pawn_direction(enemy);
+      board->zobrist ^= ZOBRIST_EP_FILE[get_file(board->ep_target)];
+    }
+  }
+
+  board->side_to_move ^= 1;
+  board->zobrist ^= ZOBRIST_COLOR;
+
+  return old;
 }

@@ -40,6 +40,13 @@ typedef struct {
   move_t moves[MAX_MOVES];
   uint8_t len;
 } move_list_t;
+typedef struct {
+  uint64_t zobrist;
+  uint8_t rights;
+  square_t ep_target;
+  uint8_t halfmove_clock;
+  piece_t captured;
+} undo_t;
 
 enum {
   RT_WK = 1 << 0,
