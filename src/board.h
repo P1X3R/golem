@@ -26,7 +26,7 @@ static bool FORCE_INLINE is_square_attacked(square_t sq, color_t attacker_color,
                                             bitboard_t occupancy);
 bool was_legal(move_t move, const board_t* board);
 undo_t do_move(move_t move, board_t* board);
-void undo_move(undo_t* undo, board_t* board);
+void undo_move(undo_t undo, move_t move, board_t* board);
 
 static const char PIECE_TO_CHAR[NR_OF_COLORS][NR_OF_PIECE_TYPES] = {
     {'P', 'N', 'B', 'R', 'Q', 'K'},  // white pieces

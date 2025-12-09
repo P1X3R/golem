@@ -22,6 +22,16 @@ static void FORCE_INLINE set_piece(board_t* board, const square_t sq,
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
 }
 
+static void FORCE_INLINE set_piece_no_hash(board_t* board, const square_t sq,
+                                           const piece_t piece,
+                                           const color_t color) {
+  const bitboard_t placed = bit(sq);
+
+  board->mailbox[sq] = piece;
+  board->bitboards[piece] |= placed;
+  board->occupancies[color] |= placed;
+}
+
 static void FORCE_INLINE clear_piece(board_t* board, const square_t sq,
                                      const piece_t piece, const color_t color) {
   const bitboard_t placed = bit(sq);
@@ -30,6 +40,16 @@ static void FORCE_INLINE clear_piece(board_t* board, const square_t sq,
   board->bitboards[piece] ^= placed;
   board->occupancies[color] ^= placed;
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
+}
+
+static void FORCE_INLINE clear_piece_no_hash(board_t* board, const square_t sq,
+                                             const piece_t piece,
+                                             const color_t color) {
+  const bitboard_t placed = bit(sq);
+
+  board->mailbox[sq] = PT_NONE;
+  board->bitboards[piece] ^= placed;
+  board->occupancies[color] ^= placed;
 }
 
 static board_t FORCE_INLINE empty_board() {
@@ -376,4 +396,48 @@ undo_t do_move(const move_t move, board_t* board) {
   board->zobrist ^= ZOBRIST_COLOR;
 
   return old;
+}
+
+void undo_move(const undo_t undo, const move_t move, board_t* board) {
+  board->rights = undo.rights;
+  board->ep_target = undo.ep_target;
+  board->halfmove_clock = undo.halfmove_clock;
+  board->zobrist = undo.zobrist;
+  board->side_to_move ^= 1;
+
+  const color_t color = board->side_to_move;
+  const color_t enemy = color ^ 1;
+  const square_t from = get_from(move), to = get_to(move);
+  const uint8_t flags = get_flags(move);
+  const piece_t final = board->mailbox[to];
+  const piece_t initial = (flags & FLAG_PROMOTION) ? PT_PAWN : final;
+
+  clear_piece_no_hash(board, to, final, color);
+
+  if (flags == FLAG_EP) {
+    const square_t captured_pawn = to_square(get_rank(from), get_file(to));
+    set_piece_no_hash(board, captured_pawn, PT_PAWN, enemy);
+  } else if (flags & FLAG_CAPTURE) {
+    set_piece_no_hash(board, to, undo.captured, enemy);
+  }
+
+  if (is_castling(move)) {
+    square_t rook_from = (flags == FLAG_KING_SIDE) ? SQ_H1 : SQ_A1;
+    square_t rook_to = (flags == FLAG_KING_SIDE) ? SQ_F1 : SQ_D1;
+    if (color == CLR_BLACK) {
+      rook_from += SQ_A8, rook_to += SQ_A8;
+    }
+
+    clear_piece_no_hash(board, rook_to, PT_ROOK, color);
+    set_piece_no_hash(board, rook_from, PT_ROOK, color);
+  }
+
+  set_piece_no_hash(board, from, initial, color);
+
+  board->occupancy =
+      board->occupancies[CLR_WHITE] | board->occupancies[CLR_BLACK];
+
+  if (initial == PT_KING) {
+    board->kings[color] = from;
+  }
 }
