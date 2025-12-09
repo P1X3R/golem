@@ -6,13 +6,13 @@
 #include "defs.h"
 #include "luts.h"
 
-uint32_t FORCE_INLINE get_magic_index(const magic_t* entry,
+FORCE_INLINE uint32_t get_magic_index(const magic_t* entry,
                                       const bitboard_t occupancy) {
   return entry->offset +
          (((entry->mask & occupancy) * entry->magic) >> entry->shift);
 }
 
-bitboard_t FORCE_INLINE gen_piece_attacks(const piece_t piece,
+FORCE_INLINE bitboard_t gen_piece_attacks(const piece_t piece,
                                           const color_t color,
                                           const bitboard_t occupancy,
                                           const square_t sq) {
@@ -37,6 +37,8 @@ bitboard_t FORCE_INLINE gen_piece_attacks(const piece_t piece,
     case PT_NONE:
       return 0ULL;
   }
+
+  return 0ULL;
 }
 
 void gen_non_evasion_moves(const board_t* __restrict board,

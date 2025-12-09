@@ -6,7 +6,7 @@
 #include "board.h"
 #include "defs.h"
 
-static void FORCE_INLINE splat_moves(const square_t from, bitboard_t moves,
+static FORCE_INLINE void splat_moves(const square_t from, bitboard_t moves,
                                      const uint8_t flags,
                                      move_list_t* move_list) {
   while (moves) {
@@ -14,7 +14,7 @@ static void FORCE_INLINE splat_moves(const square_t from, bitboard_t moves,
   }
 }
 
-static void FORCE_INLINE splat_pawn_moves(const int8_t direction,
+static FORCE_INLINE void splat_pawn_moves(const int8_t direction,
                                           bitboard_t moves, const uint8_t flags,
                                           move_list_t* move_list) {
   while (moves) {
@@ -23,7 +23,7 @@ static void FORCE_INLINE splat_pawn_moves(const int8_t direction,
   }
 }
 
-static void FORCE_INLINE splat_promotion_moves(const int8_t direction,
+static FORCE_INLINE void splat_promotion_moves(const int8_t direction,
                                                bitboard_t moves,
                                                const uint8_t flags,
                                                move_list_t* move_list) {
@@ -50,7 +50,6 @@ void gen_pawn_pushes(const board_t* __restrict board, const bitboard_t mask,
   const bitboard_t single_pushes =
       (color == CLR_WHITE) ? (pawns << 8) & empty : (pawns >> 8) & empty;
   const int8_t down = get_pawn_direction(color ^ 1);
-  const bitboard_t promotion_rank = (color == CLR_WHITE) ? R8 : R1;
   bitboard_t double_pushes = (color == CLR_WHITE)
                                  ? (single_pushes << 8) & empty & R4
                                  : (single_pushes >> 8) & empty & R5;

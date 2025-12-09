@@ -1,6 +1,7 @@
 #pragma once
 
 #include <assert.h>
+#include <stdbool.h>
 #include <stdint.h>
 
 #if defined(__GNUC__) || defined(__clang__)
@@ -54,26 +55,23 @@ enum {
   RT_BK = 1 << 2,
   RT_BQ = 1 << 3,
 };
-enum {
-  R1 = 0x00000000000000FFULL,
-  R2 = 0x000000000000FF00ULL,
-  R3 = 0x0000000000FF0000ULL,
-  R4 = 0x00000000FF000000ULL,
-  R5 = 0x000000FF00000000ULL,
-  R6 = 0x0000FF0000000000ULL,
-  R7 = 0x00FF000000000000ULL,
-  R8 = 0xFF00000000000000ULL,
-};
-enum {
-  FA = 0x0101010101010101ULL << 0,
-  FB = 0x0101010101010101ULL << 1,
-  FC = 0x0101010101010101ULL << 2,
-  FD = 0x0101010101010101ULL << 3,
-  FE = 0x0101010101010101ULL << 4,
-  FF = 0x0101010101010101ULL << 5,
-  FG = 0x0101010101010101ULL << 6,
-  FH = 0x0101010101010101ULL << 7,
-};
+static const bitboard_t R1 = 0x00000000000000FFULL;
+static const bitboard_t R2 = 0x000000000000FF00ULL;
+static const bitboard_t R3 = 0x0000000000FF0000ULL;
+static const bitboard_t R4 = 0x00000000FF000000ULL;
+static const bitboard_t R5 = 0x000000FF00000000ULL;
+static const bitboard_t R6 = 0x0000FF0000000000ULL;
+static const bitboard_t R7 = 0x00FF000000000000ULL;
+static const bitboard_t R8 = 0xFF00000000000000ULL;
+
+static const bitboard_t FA = 0x0101010101010101ULL << 0;
+static const bitboard_t FB = 0x0101010101010101ULL << 1;
+static const bitboard_t FC = 0x0101010101010101ULL << 2;
+static const bitboard_t FD = 0x0101010101010101ULL << 3;
+static const bitboard_t FE = 0x0101010101010101ULL << 4;
+static const bitboard_t FF = 0x0101010101010101ULL << 5;
+static const bitboard_t FG = 0x0101010101010101ULL << 6;
+static const bitboard_t FH = 0x0101010101010101ULL << 7;
 // clang-format off
 enum {
     SQ_A1, SQ_B1, SQ_C1, SQ_D1, SQ_E1, SQ_F1, SQ_G1, SQ_H1,
@@ -88,38 +86,38 @@ enum {
     SQ_NONE = 65
 };
 // clang-format on
-enum {
-  FLAG_QUIET = 0b0000,
-  FLAG_DOUBLE_PUSH = 0b0001,
-  FLAG_KING_SIDE = 0b0010,
-  FLAG_QUEEN_SIDE = 0b0011,
-  FLAG_CAPTURE = 0b0100,
-  FLAG_EP = 0b0101,
-  FLAG_PROMOTION = 0b1000,
+enum move_flags {
+  FLAG_QUIET = 0x0,
+  FLAG_DOUBLE_PUSH = 0x1,
+  FLAG_KING_SIDE = 0x2,
+  FLAG_QUEEN_SIDE = 0x3,
+  FLAG_CAPTURE = 0x4,
+  FLAG_EP = 0x5,
+  FLAG_PROMOTION = 0x8
 };
 
-move_t FORCE_INLINE new_move(const square_t from, const square_t to,
+FORCE_INLINE move_t new_move(const square_t from, const square_t to,
                              const uint8_t flags) {
   assert(from <= SQ_H8);
   assert(to <= SQ_H8);
   assert(flags <= 0xF);  // flags should be only 4-bits
   return from | (to << 6) | (flags << 12);
 }
-uint8_t FORCE_INLINE get_from(const move_t move) { return move & 0x3f; }
-uint8_t FORCE_INLINE get_to(const move_t move) { return (move >> 6) & 0x3f; }
-uint8_t FORCE_INLINE get_flags(const move_t move) { return move >> 12; }
-bool FORCE_INLINE is_castling(const move_t move) {
+FORCE_INLINE uint8_t get_from(const move_t move) { return move & 0x3f; }
+FORCE_INLINE uint8_t get_to(const move_t move) { return (move >> 6) & 0x3f; }
+FORCE_INLINE uint8_t get_flags(const move_t move) { return move >> 12; }
+FORCE_INLINE bool is_castling(const move_t move) {
   return (get_flags(move) & ~1) == 2;
 }
 
-void FORCE_INLINE push_move(move_list_t* move_list, const move_t move) {
+FORCE_INLINE void push_move(move_list_t* move_list, const move_t move) {
   assert(move_list->len < MAX_MOVES);
   move_list->moves[move_list->len++] = move;
 }
 
-uint8_t FORCE_INLINE encode_promotion(const piece_t promoted) {
+FORCE_INLINE uint8_t encode_promotion(const piece_t promoted) {
   return FLAG_PROMOTION | (promoted - 1);
 }
-piece_t FORCE_INLINE decode_promotion(const uint8_t flags) {
-  return (piece_t)((0b11 & flags) + 1);
+FORCE_INLINE piece_t decode_promotion(const uint8_t flags) {
+  return (piece_t)((3 & flags) + 1);
 }

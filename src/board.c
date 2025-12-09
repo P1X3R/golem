@@ -12,7 +12,7 @@
 #include "movegen.h"
 #include "zobrist.h"
 
-static void FORCE_INLINE set_piece(board_t* board, const square_t sq,
+static FORCE_INLINE void set_piece(board_t* board, const square_t sq,
                                    const piece_t piece, const color_t color) {
   const bitboard_t placed = bit(sq);
 
@@ -22,7 +22,7 @@ static void FORCE_INLINE set_piece(board_t* board, const square_t sq,
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
 }
 
-static void FORCE_INLINE set_piece_no_hash(board_t* board, const square_t sq,
+static FORCE_INLINE void set_piece_no_hash(board_t* board, const square_t sq,
                                            const piece_t piece,
                                            const color_t color) {
   const bitboard_t placed = bit(sq);
@@ -32,7 +32,7 @@ static void FORCE_INLINE set_piece_no_hash(board_t* board, const square_t sq,
   board->occupancies[color] |= placed;
 }
 
-static void FORCE_INLINE clear_piece(board_t* board, const square_t sq,
+static FORCE_INLINE void clear_piece(board_t* board, const square_t sq,
                                      const piece_t piece, const color_t color) {
   const bitboard_t placed = bit(sq);
 
@@ -42,7 +42,7 @@ static void FORCE_INLINE clear_piece(board_t* board, const square_t sq,
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
 }
 
-static void FORCE_INLINE clear_piece_no_hash(board_t* board, const square_t sq,
+static FORCE_INLINE void clear_piece_no_hash(board_t* board, const square_t sq,
                                              const piece_t piece,
                                              const color_t color) {
   const bitboard_t placed = bit(sq);
@@ -52,11 +52,11 @@ static void FORCE_INLINE clear_piece_no_hash(board_t* board, const square_t sq,
   board->occupancies[color] ^= placed;
 }
 
-static board_t FORCE_INLINE empty_board() {
+static FORCE_INLINE board_t empty_board() {
   board_t board = {
-      .mailbox = {},
-      .bitboards = {},
-      .occupancies = {},
+      .mailbox = {0},
+      .bitboards = {0},
+      .occupancies = {0},
       .occupancy = 0ULL,
       .zobrist = 0ULL,
       .kings = {SQ_NONE, SQ_NONE},
@@ -73,7 +73,7 @@ static board_t FORCE_INLINE empty_board() {
   return board;
 }
 
-static piece_t FORCE_INLINE char_to_piece(const char c) {
+static FORCE_INLINE piece_t char_to_piece(const char c) {
   switch (c) {
     case 'p':
       return PT_PAWN;
@@ -226,10 +226,10 @@ board_t from_fen(char fen[]) {
   return board;
 }
 
-bool FORCE_INLINE is_square_attacked(const square_t sq,
-                                     const color_t attacker_color,
-                                     const board_t* board,
-                                     const bitboard_t occupancy) {
+static FORCE_INLINE bool is_square_attacked(const square_t sq,
+                                            const color_t attacker_color,
+                                            const board_t* board,
+                                            const bitboard_t occupancy) {
   const bitboard_t attackers = board->occupancies[attacker_color];
 
   // Pawn attacks (reverse color direction)
@@ -300,7 +300,7 @@ bool was_legal(const move_t move, const board_t* board) {
   return !is_square_attacked(board->kings[us], enemy, board, board->occupancy);
 }
 
-static uint8_t FORCE_INLINE rook_to_right(const square_t sq) {
+static FORCE_INLINE uint8_t rook_to_right(const square_t sq) {
   switch (sq) {
     case SQ_A1:
       return RT_WQ;

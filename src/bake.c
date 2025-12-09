@@ -146,7 +146,7 @@ bitboard_t gen_occupancy(uint16_t variant, bitboard_t mask) {
   return occupancy;
 }
 
-uint64_t FORCE_INLINE fewbits() {
+FORCE_INLINE uint64_t fewbits() {
   return random_u64() & random_u64() & random_u64();
 }
 
