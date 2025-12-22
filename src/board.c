@@ -37,8 +37,8 @@ static FORCE_INLINE void clear_piece(board_t* board, const square_t sq,
   const bitboard_t placed = bit(sq);
 
   board->mailbox[sq] = PT_NONE;
-  board->bitboards[piece] ^= placed;
-  board->occupancies[color] ^= placed;
+  board->bitboards[piece] &= ~placed;
+  board->occupancies[color] &= ~placed;
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
 }
 
@@ -48,8 +48,8 @@ static FORCE_INLINE void clear_piece_no_hash(board_t* board, const square_t sq,
   const bitboard_t placed = bit(sq);
 
   board->mailbox[sq] = PT_NONE;
-  board->bitboards[piece] ^= placed;
-  board->occupancies[color] ^= placed;
+  board->bitboards[piece] &= ~placed;
+  board->occupancies[color] &= ~placed;
 }
 
 static FORCE_INLINE board_t empty_board() {
@@ -283,6 +283,9 @@ bool was_legal(const move_t move, const board_t* board) {
   const color_t us = board->side_to_move ^ 1;
   const color_t enemy = board->side_to_move;
 
+  assert(board->kings[us] ==
+         __builtin_ctzll(board->bitboards[PT_KING] & board->occupancies[us]));
+
   if (is_castling(move)) {
     const uint8_t flags = get_flags(move);
     const uint8_t side = (flags == FLAG_KING_SIDE) ? 0 : 1;
@@ -336,18 +339,22 @@ undo_t do_move(const move_t move, board_t* board) {
 
   if (flags == FLAG_EP) {
     const square_t captured_pawn = to_square(get_rank(from), get_file(to));
-    clear_piece(board, captured_pawn, PT_PAWN, color ^ 1);
+    assert(board->mailbox[captured_pawn] != PT_NONE &&
+           "En passant capture on empty square");
+    clear_piece(board, captured_pawn, PT_PAWN, enemy);
   } else if (flags & FLAG_CAPTURE) {
-    board->bitboards[captured] ^= bit(to);
-    board->occupancies[enemy] ^= bit(to);
-    board->zobrist ^= ZOBRIST_PIECES[captured][to];
-  }
-
-  if (is_castling(move)) {
-    square_t rook_from = (flags == FLAG_KING_SIDE) ? SQ_H1 : SQ_A1;
-    square_t rook_to = (flags == FLAG_KING_SIDE) ? SQ_F1 : SQ_D1;
-    if (color == CLR_BLACK) {
-      rook_from += SQ_A8, rook_to += SQ_A8;
+    assert(captured != PT_NONE && "Capture on empty square");
+    assert((bit(to) & board->occupancies[enemy]) &&
+           "Capture on non-enemy square");
+    clear_piece(board, to, captured, enemy);
+  } else if (is_castling(move)) {
+    square_t rook_from, rook_to;
+    if (color == CLR_WHITE) {
+      rook_from = (flags == FLAG_KING_SIDE) ? SQ_H1 : SQ_A1;
+      rook_to = (flags == FLAG_KING_SIDE) ? SQ_F1 : SQ_D1;
+    } else {
+      rook_from = (flags == FLAG_KING_SIDE) ? SQ_H8 : SQ_A8;
+      rook_to = (flags == FLAG_KING_SIDE) ? SQ_F8 : SQ_D8;
     }
 
     clear_piece(board, rook_from, PT_ROOK, color);
@@ -367,7 +374,8 @@ undo_t do_move(const move_t move, board_t* board) {
     board->rights &= right_mask;
   } else if (initial == PT_ROOK) {
     board->rights &= ~rook_to_right(from);
-  } else if (captured == PT_ROOK) {
+  }
+  if (captured == PT_ROOK) {
     board->rights &= ~rook_to_right(to);
   }
   board->zobrist ^= ZOBRIST_CASTLING_RIGHTS[board->rights];
@@ -419,13 +427,14 @@ void undo_move(const undo_t undo, const move_t move, board_t* board) {
     set_piece_no_hash(board, captured_pawn, PT_PAWN, enemy);
   } else if (flags & FLAG_CAPTURE) {
     set_piece_no_hash(board, to, undo.captured, enemy);
-  }
-
-  if (is_castling(move)) {
-    square_t rook_from = (flags == FLAG_KING_SIDE) ? SQ_H1 : SQ_A1;
-    square_t rook_to = (flags == FLAG_KING_SIDE) ? SQ_F1 : SQ_D1;
-    if (color == CLR_BLACK) {
-      rook_from += SQ_A8, rook_to += SQ_A8;
+  } else if (is_castling(move)) {
+    square_t rook_from, rook_to;
+    if (color == CLR_WHITE) {
+      rook_from = (flags == FLAG_KING_SIDE) ? SQ_H1 : SQ_A1;
+      rook_to = (flags == FLAG_KING_SIDE) ? SQ_F1 : SQ_D1;
+    } else {
+      rook_from = (flags == FLAG_KING_SIDE) ? SQ_H8 : SQ_A8;
+      rook_to = (flags == FLAG_KING_SIDE) ? SQ_F8 : SQ_D8;
     }
 
     clear_piece_no_hash(board, rook_to, PT_ROOK, color);
