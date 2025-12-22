@@ -8,7 +8,7 @@ ifeq ($(MODE),debug)
               -fsanitize=address,undefined -fno-omit-frame-pointer
     LDFLAGS := -fsanitize=address,undefined
 else ifeq ($(MODE),release)
-    CFLAGS := -O3 -march=native -Wall -Wextra -Wpedantic -std=c99 -DNDEBUG
+    CFLAGS := -O3 -march=native -flto -Wall -Wextra -Wpedantic -std=c99 -DNDEBUG
     LDFLAGS :=
 else
     $(error Unknown MODE '$(MODE)' (expected 'debug' or 'release'))
