@@ -42,9 +42,7 @@ uint64_t perft(board_t* board, const uint8_t depth, const bool divide) {
 
   uint64_t nodes = 0;
 
-  move_list_t move_list = {{0}, 0};
-  gen_non_evasion_moves(board, &move_list);
-
+  move_list_t move_list = gen_color_moves(board);
   for (uint8_t i = 0; i < move_list.len; i++) {
     const move_t move = move_list.moves[i];
 
@@ -97,9 +95,7 @@ int main(int argc, char* argv[]) {
       const square_t from = to_square(token[1] - '1', token[0] - 'a');
       const square_t to = to_square(token[3] - '1', token[2] - 'a');
 
-      move_list_t move_list = {{0}, 0};
-      gen_non_evasion_moves(&board, &move_list);
-
+      move_list_t move_list = gen_color_moves(&board);
       for (uint8_t i = 0; i < move_list.len; i++) {
         const move_t move = move_list.moves[i];
 

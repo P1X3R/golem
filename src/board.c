@@ -55,10 +55,12 @@ static FORCE_INLINE void clear_piece_no_hash(board_t* board, const square_t sq,
 static FORCE_INLINE board_t empty_board() {
   board_t board = {
       .mailbox = {0},
+      .history = {0},
       .bitboards = {0},
       .occupancies = {0},
       .occupancy = 0ULL,
       .zobrist = 0ULL,
+      .num_moves = 0,
       .kings = {SQ_NONE, SQ_NONE},
       .rights = 0,
       .halfmove_clock = 0,
@@ -210,18 +212,9 @@ board_t from_fen(char fen[]) {
   }
 
   /*
-   * --- Halfmove clock ---
+   * --- Half-move clock ---
    */
-  token = strtok(NULL, " ");
-  if (token == NULL) {
-    return board;
-  }
-
-  char* endptr;
-  board.halfmove_clock = strtoul(token, &endptr, 10);
-  if (endptr == token || *endptr != '\0') {
-    board.halfmove_clock = 0;
-  }
+  board.halfmove_clock = atoi(strtok(NULL, " "));
 
   return board;
 }
@@ -403,6 +396,8 @@ undo_t do_move(const move_t move, board_t* board) {
   board->side_to_move ^= 1;
   board->zobrist ^= ZOBRIST_COLOR;
 
+  board->history[board->num_moves++] = board->zobrist;
+
   return old;
 }
 
@@ -412,6 +407,7 @@ void undo_move(const undo_t undo, const move_t move, board_t* board) {
   board->halfmove_clock = undo.halfmove_clock;
   board->zobrist = undo.zobrist;
   board->side_to_move ^= 1;
+  board->num_moves--;
 
   const color_t color = board->side_to_move;
   const color_t enemy = color ^ 1;
@@ -449,4 +445,38 @@ void undo_move(const undo_t undo, const move_t move, board_t* board) {
   if (initial == PT_KING) {
     board->kings[color] = from;
   }
+}
+
+FORCE_INLINE bool is_draw_by_repetition(const board_t* board,
+                                        const uint8_t ply) {
+  unsigned reps = 0;
+
+  for (int i = board->num_moves - 2; i >= 0; i -= 2) {
+    if (i < board->num_moves - board->halfmove_clock) {
+      break;
+    }
+
+    if (board->history[i] == board->zobrist &&
+        (i > board->num_moves - ply || ++reps == 2)) {
+      return true;
+    }
+  }
+
+  return false;
+}
+
+FORCE_INLINE bool is_draw_by_insufficient_material(const board_t* board) {
+  return !(board->bitboards[PT_PAWN] | board->bitboards[PT_ROOK] |
+           board->bitboards[PT_QUEEN]) &&
+         (!more_than_one(board->occupancies[CLR_WHITE]) ||
+          !more_than_one(board->occupancies[CLR_BLACK])) &&
+         (!more_than_one(board->bitboards[PT_KNIGHT] |
+                         board->bitboards[PT_BISHOP]) ||
+          (!board->bitboards[PT_BISHOP] &&
+           __builtin_popcount(board->bitboards[PT_KNIGHT]) <= 2));
+}
+
+FORCE_INLINE bool is_draw(const board_t* board, const uint8_t ply) {
+  return board->halfmove_clock >= 100 || is_draw_by_repetition(board, ply) ||
+         is_draw_by_insufficient_material(board);
 }

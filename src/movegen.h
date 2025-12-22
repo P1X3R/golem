@@ -41,5 +41,5 @@ FORCE_INLINE bitboard_t gen_piece_attacks(const piece_t piece,
   return 0ULL;
 }
 
-void gen_non_evasion_moves(const board_t* __restrict board,
-                           move_list_t* __restrict move_list);
+move_list_t gen_color_moves(const board_t* board);
+move_list_t gen_captures_only(const board_t* board);

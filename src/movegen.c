@@ -41,7 +41,7 @@ static FORCE_INLINE void splat_promotion_moves(const int8_t direction,
   }
 }
 
-void gen_pawn_pushes(const board_t* __restrict board, const bitboard_t mask,
+void gen_pawn_pushes(const board_t* __restrict board,
                      move_list_t* __restrict move_list) {
   const color_t color = board->side_to_move;
   const bitboard_t empty = ~board->occupancy;
@@ -57,13 +57,13 @@ void gen_pawn_pushes(const board_t* __restrict board, const bitboard_t mask,
       (color == CLR_WHITE) ? single_pushes & R8 : single_pushes & R1;
   bitboard_t quiet_pushes = single_pushes ^ promotion_pushes;
 
-  splat_promotion_moves(down, promotion_pushes & mask, FLAG_QUIET, move_list);
-  splat_pawn_moves(down, quiet_pushes & mask, FLAG_QUIET, move_list);
-  splat_pawn_moves((int8_t)(down + down), double_pushes & mask,
-                   FLAG_DOUBLE_PUSH, move_list);
+  splat_promotion_moves(down, promotion_pushes, FLAG_QUIET, move_list);
+  splat_pawn_moves(down, quiet_pushes, FLAG_QUIET, move_list);
+  splat_pawn_moves((int8_t)(down + down), double_pushes, FLAG_DOUBLE_PUSH,
+                   move_list);
 }
 
-void gen_pawn_captures(const board_t* __restrict board, const bitboard_t mask,
+void gen_pawn_captures(const board_t* __restrict board,
                        move_list_t* __restrict move_list) {
   const color_t color = board->side_to_move;
   const bitboard_t pawns =
@@ -86,13 +86,13 @@ void gen_pawn_captures(const board_t* __restrict board, const bitboard_t mask,
   bitboard_t right_captures_promo = right_captures & promo_rank;
   bitboard_t right_captures_no_promo = right_captures ^ right_captures_promo;
 
-  splat_promotion_moves(left_capture_direction, left_captures_promo & mask,
+  splat_promotion_moves(left_capture_direction, left_captures_promo,
                         FLAG_CAPTURE, move_list);
-  splat_promotion_moves(right_capture_direction, right_captures_promo & mask,
+  splat_promotion_moves(right_capture_direction, right_captures_promo,
                         FLAG_CAPTURE, move_list);
-  splat_pawn_moves(left_capture_direction, left_captures_no_promo & mask,
-                   FLAG_CAPTURE, move_list);
-  splat_pawn_moves(right_capture_direction, right_captures_no_promo & mask,
+  splat_pawn_moves(left_capture_direction, left_captures_no_promo, FLAG_CAPTURE,
+                   move_list);
+  splat_pawn_moves(right_capture_direction, right_captures_no_promo,
                    FLAG_CAPTURE, move_list);
 
   if (board->ep_target == SQ_NONE) {
@@ -136,10 +136,11 @@ static void gen_castling(const board_t* __restrict board,
   }
 }
 
-void gen_non_evasion_moves(const board_t* __restrict board,
-                           move_list_t* __restrict move_list) {
-  gen_pawn_pushes(board, UINT64_MAX, move_list);
-  gen_pawn_captures(board, UINT64_MAX, move_list);
+move_list_t gen_color_moves(const board_t* board) {
+  move_list_t move_list = {{0}, 0};
+
+  gen_pawn_pushes(board, &move_list);
+  gen_pawn_captures(board, &move_list);
 
   const bitboard_t empty = ~board->occupancy;
   const bitboard_t friendly = board->occupancies[board->side_to_move];
@@ -153,10 +154,34 @@ void gen_non_evasion_moves(const board_t* __restrict board,
       const bitboard_t attacks =
           gen_piece_attacks(piece, board->side_to_move, board->occupancy, from);
 
-      splat_moves(from, attacks & empty, FLAG_QUIET, move_list);
-      splat_moves(from, attacks & enemy, FLAG_CAPTURE, move_list);
+      splat_moves(from, attacks & empty, FLAG_QUIET, &move_list);
+      splat_moves(from, attacks & enemy, FLAG_CAPTURE, &move_list);
     }
   }
 
-  gen_castling(board, move_list);
+  gen_castling(board, &move_list);
+
+  return move_list;
+}
+
+move_list_t gen_captures_only(const board_t* board) {
+  move_list_t move_list = {{0}, 0};
+
+  gen_pawn_captures(board, &move_list);
+
+  const bitboard_t friendly = board->occupancies[board->side_to_move];
+  const bitboard_t enemy = board->occupancies[board->side_to_move ^ 1];
+
+  for (piece_t piece = PT_KNIGHT; piece <= PT_KING; piece++) {
+    bitboard_t temp = board->bitboards[piece] & friendly;
+
+    while (temp) {
+      const square_t from = pop_lsb(&temp);
+      const bitboard_t attacks =
+          gen_piece_attacks(piece, board->side_to_move, board->occupancy, from);
+      splat_moves(from, attacks & enemy, FLAG_CAPTURE, &move_list);
+    }
+  }
+
+  return move_list;
 }

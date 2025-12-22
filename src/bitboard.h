@@ -25,3 +25,6 @@ FORCE_INLINE bool is_valid_coord(const int rank, const int file) {
 static FORCE_INLINE bitboard_t get_adjacent(const bitboard_t target) {
   return ((target & ~FH) << 1) | ((target & ~FA) >> 1);
 }
+FORCE_INLINE bool more_than_one(const bitboard_t target) {
+  return target & (target - 1);
+}
