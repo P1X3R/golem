@@ -15,10 +15,13 @@ typedef struct {
   bitboard_t occupancies[NR_OF_COLORS];
   bitboard_t occupancy;
   uint64_t zobrist;
+  int16_t mg_score[NR_OF_COLORS];
+  int16_t eg_score[NR_OF_COLORS];
   int num_moves;
   square_t kings[NR_OF_COLORS];
   uint8_t rights;
   uint8_t halfmove_clock;
+  uint8_t phase;
   square_t ep_target;
   color_t side_to_move;
 } board_t;

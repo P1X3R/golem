@@ -10,15 +10,20 @@
 #include "bitboard.h"
 #include "defs.h"
 #include "movegen.h"
+#include "psqt.h"
 #include "zobrist.h"
 
 static FORCE_INLINE void set_piece(board_t* board, const square_t sq,
                                    const piece_t piece, const color_t color) {
   const bitboard_t placed = bit(sq);
+  const score_t entry = PSQT[piece][(color == CLR_WHITE) ? sq : sq ^ 56];
 
   board->mailbox[sq] = piece;
   board->bitboards[piece] |= placed;
   board->occupancies[color] |= placed;
+  board->mg_score[color] = (int16_t)(board->mg_score[color] + entry.mg);
+  board->eg_score[color] = (int16_t)(board->eg_score[color] + entry.eg);
+  board->phase += PHASE_VALUES[piece];
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
 }
 
@@ -26,19 +31,27 @@ static FORCE_INLINE void set_piece_no_hash(board_t* board, const square_t sq,
                                            const piece_t piece,
                                            const color_t color) {
   const bitboard_t placed = bit(sq);
+  const score_t entry = PSQT[piece][(color == CLR_WHITE) ? sq : sq ^ 56];
 
   board->mailbox[sq] = piece;
   board->bitboards[piece] |= placed;
+  board->mg_score[color] = (int16_t)(board->mg_score[color] + entry.mg);
+  board->eg_score[color] = (int16_t)(board->eg_score[color] + entry.eg);
+  board->phase += PHASE_VALUES[piece];
   board->occupancies[color] |= placed;
 }
 
 static FORCE_INLINE void clear_piece(board_t* board, const square_t sq,
                                      const piece_t piece, const color_t color) {
   const bitboard_t placed = bit(sq);
+  const score_t entry = PSQT[piece][(color == CLR_WHITE) ? sq : sq ^ 56];
 
   board->mailbox[sq] = PT_NONE;
   board->bitboards[piece] &= ~placed;
   board->occupancies[color] &= ~placed;
+  board->mg_score[color] = (int16_t)(board->mg_score[color] - entry.mg);
+  board->eg_score[color] = (int16_t)(board->eg_score[color] - entry.eg);
+  board->phase -= PHASE_VALUES[piece];
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
 }
 
@@ -46,10 +59,14 @@ static FORCE_INLINE void clear_piece_no_hash(board_t* board, const square_t sq,
                                              const piece_t piece,
                                              const color_t color) {
   const bitboard_t placed = bit(sq);
+  const score_t entry = PSQT[piece][(color == CLR_WHITE) ? sq : sq ^ 56];
 
   board->mailbox[sq] = PT_NONE;
   board->bitboards[piece] &= ~placed;
   board->occupancies[color] &= ~placed;
+  board->mg_score[color] = (int16_t)(board->mg_score[color] - entry.mg);
+  board->eg_score[color] = (int16_t)(board->eg_score[color] - entry.eg);
+  board->phase -= PHASE_VALUES[piece];
 }
 
 static FORCE_INLINE board_t empty_board() {
@@ -60,10 +77,13 @@ static FORCE_INLINE board_t empty_board() {
       .occupancies = {0},
       .occupancy = 0ULL,
       .zobrist = 0ULL,
+      .mg_score = {0},
+      .eg_score = {0},
       .num_moves = 0,
       .kings = {SQ_NONE, SQ_NONE},
       .rights = 0,
       .halfmove_clock = 0,
+      .phase = 0,
       .ep_target = SQ_NONE,
       .side_to_move = CLR_WHITE,
   };
