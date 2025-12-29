@@ -11,6 +11,7 @@
 #include "defs.h"
 #include "movegen.h"
 #include "psqt.h"
+#include "uci.h"
 #include "zobrist.h"
 
 static FORCE_INLINE void set_piece(board_t* board, const square_t sq,
@@ -64,12 +65,12 @@ static FORCE_INLINE void clear_piece_no_hash(board_t* board, const square_t sq,
   board->mailbox[sq] = PT_NONE;
   board->bitboards[piece] &= ~placed;
   board->occupancies[color] &= ~placed;
-  board->mg_score[color] = (int16_t)(board->mg_score[color] - entry.mg);
-  board->eg_score[color] = (int16_t)(board->eg_score[color] - entry.eg);
+  board->mg_score[color] -= entry.mg;
+  board->eg_score[color] -= entry.eg;
   board->phase -= PHASE_VALUES[piece];
 }
 
-static FORCE_INLINE board_t empty_board() {
+static FORCE_INLINE board_t empty_board(void) {
   board_t board = {
       .mailbox = {0},
       .history = {0},
@@ -114,14 +115,16 @@ static FORCE_INLINE piece_t char_to_piece(const char c) {
   }
 }
 
-board_t from_fen(char fen[]) {
+board_t from_fen(const char fen[]) {
   board_t board = empty_board();
-  char* token;
+
+  char temp[128] = {0};
+  strcpy(temp, fen);
 
   /*
    * --- Piece placement ---
    */
-  token = strtok(fen, " ");
+  char* token = strtok(temp, " ");
   if (token == NULL) {
     return board;
   }
@@ -144,6 +147,8 @@ board_t from_fen(char fen[]) {
       if (piece == PT_KING) {
         board.kings[color] = sq;
       }
+    } else {
+      UCI_SEND("info string invalid char in fen %c", c);
     }
   }
 
@@ -166,6 +171,8 @@ board_t from_fen(char fen[]) {
       board.zobrist ^= ZOBRIST_COLOR;
       break;
     default:
+      UCI_SEND("info string invalid color %c", token[0]);
+      UCI_SEND("info string using fallback white to move");
       board.side_to_move = CLR_WHITE;
       break;
   }
@@ -193,6 +200,7 @@ board_t from_fen(char fen[]) {
         board.rights |= RT_BQ;
         break;
       default:
+        UCI_SEND("info string invalid right %c", *current);
         break;
     }
   }
@@ -228,7 +236,11 @@ board_t from_fen(char fen[]) {
         board.ep_target = target;
         board.zobrist ^= ZOBRIST_EP_FILE[get_file(target)];
       }
+    } else {
+      UCI_SEND("info string malformed en passant square");
     }
+  } else if (token[0] != '-') {
+    UCI_SEND("info string only one char in en passant square");
   }
 
   /*
@@ -277,6 +289,11 @@ static FORCE_INLINE bool is_square_attacked(const square_t sq,
   }
 
   return false;
+}
+
+bool in_check(const board_t* board) {
+  return is_square_attacked(board->kings[board->side_to_move],
+                            board->side_to_move ^ 1, board, board->occupancy);
 }
 
 static const square_t CASTLE_PATHS[NR_OF_COLORS][NR_OF_CASTLING_SIDES][3] = {
@@ -467,18 +484,19 @@ void undo_move(const undo_t undo, const move_t move, board_t* board) {
   }
 }
 
-FORCE_INLINE bool is_draw_by_repetition(const board_t* board,
-                                        const uint8_t ply) {
+FORCE_INLINE bool is_draw_by_repetition(const board_t* board) {
   unsigned reps = 0;
+  const int start = board->num_moves - 1;
+  const int end = (board->halfmove_clock < board->num_moves)
+                      ? board->num_moves - board->halfmove_clock - 1
+                      : 0;
 
-  for (int i = board->num_moves - 2; i >= 0; i -= 2) {
-    if (i < board->num_moves - board->halfmove_clock) {
-      break;
-    }
-
-    if (board->history[i] == board->zobrist &&
-        (i > board->num_moves - ply || ++reps == 2)) {
-      return true;
+  for (int i = start; i >= end; i--) {
+    if (board->history[i] == board->zobrist) {
+      ++reps;
+      if (reps >= 3) {
+        return true;
+      }
     }
   }
 
@@ -496,7 +514,60 @@ FORCE_INLINE bool is_draw_by_insufficient_material(const board_t* board) {
            __builtin_popcount(board->bitboards[PT_KNIGHT]) <= 2));
 }
 
-FORCE_INLINE bool is_draw(const board_t* board, const uint8_t ply) {
-  return board->halfmove_clock >= 100 || is_draw_by_repetition(board, ply) ||
+bool is_draw(const board_t* board) {
+  return board->halfmove_clock >= 100 || is_draw_by_repetition(board) ||
          is_draw_by_insufficient_material(board);
+}
+
+static inline char piece_to_char(const piece_t p, const color_t c) {
+  static const char table[] = {'p', 'n', 'b', 'r', 'q', 'k'};
+  if (p == PT_NONE) {
+    return '.';
+  }
+  const char ch = table[p];
+  if (c == CLR_WHITE) {
+    return (char)('A' + (ch - 'a'));  // safer, stays in 'A'..'Z'
+  }
+  return ch;
+}
+
+void print_board(const board_t* board) {
+  printf("\n");
+  for (int rank = NR_OF_ROWS - 1; rank >= 0; rank--) {
+    printf("%d  ", rank + 1);
+    for (int file = 0; file < NR_OF_ROWS; file++) {
+      const square_t sq = to_square(rank, file);
+      const piece_t p = board->mailbox[sq];
+
+      if (p == PT_NONE) {
+        putchar('.');
+      } else {
+        const color_t c =
+            (bit(sq) & board->occupancies[CLR_WHITE]) ? CLR_WHITE : CLR_BLACK;
+        putchar(piece_to_char(p, c));
+      }
+
+      putchar(' ');
+    }
+    putchar('\n');
+  }
+
+  printf("\n   a b c d e f g h\n\n");
+
+  printf("Side: %s\n", board->side_to_move == CLR_WHITE ? "white" : "black");
+  printf("Castling: %c%c%c%c\n", (board->rights & RT_WK) ? 'K' : '-',
+         (board->rights & RT_WQ) ? 'Q' : '-',
+         (board->rights & RT_BK) ? 'k' : '-',
+         (board->rights & RT_BQ) ? 'q' : '-');
+
+  if (board->ep_target != SQ_NONE) {
+    printf("EP: %c%d\n", 'a' + get_file(board->ep_target),
+           1 + get_rank(board->ep_target));
+  } else {
+    printf("EP: -\n");
+  }
+
+  printf("Halfmove: %d\n", board->halfmove_clock);
+  printf("Zobrist: 0x%016lx\n", board->zobrist);
+  printf("\n");
 }

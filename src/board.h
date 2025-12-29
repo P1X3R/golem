@@ -3,14 +3,12 @@
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 
-#include "bitboard.h"
 #include "defs.h"
 
 typedef struct {
   piece_t mailbox[NR_OF_SQUARES];
-  uint64_t history[4096];
+  uint64_t history[1024];
   bitboard_t bitboards[NR_OF_PIECE_TYPES];
   bitboard_t occupancies[NR_OF_COLORS];
   bitboard_t occupancy;
@@ -26,8 +24,10 @@ typedef struct {
   color_t side_to_move;
 } board_t;
 
-board_t from_fen(char fen[]);
+board_t from_fen(const char fen[]);
 bool was_legal(move_t move, const board_t* board);
+bool in_check(const board_t* board);
 undo_t do_move(move_t move, board_t* board);
 void undo_move(undo_t undo, move_t move, board_t* board);
-FORCE_INLINE bool is_draw(const board_t* board, uint8_t ply);
+bool is_draw(const board_t* board);
+void print_board(const board_t* board);
