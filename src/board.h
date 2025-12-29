@@ -15,8 +15,8 @@ typedef struct {
   bitboard_t occupancies[NR_OF_COLORS];
   bitboard_t occupancy;
   uint64_t zobrist;
-  int16_t mg_score[NR_OF_COLORS];
-  int16_t eg_score[NR_OF_COLORS];
+  int mg_score[NR_OF_COLORS];
+  int eg_score[NR_OF_COLORS];
   int num_moves;
   square_t kings[NR_OF_COLORS];
   uint8_t rights;

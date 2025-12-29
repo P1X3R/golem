@@ -21,8 +21,8 @@ static FORCE_INLINE void set_piece(board_t* board, const square_t sq,
   board->mailbox[sq] = piece;
   board->bitboards[piece] |= placed;
   board->occupancies[color] |= placed;
-  board->mg_score[color] = (int16_t)(board->mg_score[color] + entry.mg);
-  board->eg_score[color] = (int16_t)(board->eg_score[color] + entry.eg);
+  board->mg_score[color] += entry.mg;
+  board->eg_score[color] += entry.eg;
   board->phase += PHASE_VALUES[piece];
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
 }
@@ -35,8 +35,8 @@ static FORCE_INLINE void set_piece_no_hash(board_t* board, const square_t sq,
 
   board->mailbox[sq] = piece;
   board->bitboards[piece] |= placed;
-  board->mg_score[color] = (int16_t)(board->mg_score[color] + entry.mg);
-  board->eg_score[color] = (int16_t)(board->eg_score[color] + entry.eg);
+  board->mg_score[color] += entry.mg;
+  board->eg_score[color] += entry.eg;
   board->phase += PHASE_VALUES[piece];
   board->occupancies[color] |= placed;
 }
@@ -49,8 +49,8 @@ static FORCE_INLINE void clear_piece(board_t* board, const square_t sq,
   board->mailbox[sq] = PT_NONE;
   board->bitboards[piece] &= ~placed;
   board->occupancies[color] &= ~placed;
-  board->mg_score[color] = (int16_t)(board->mg_score[color] - entry.mg);
-  board->eg_score[color] = (int16_t)(board->eg_score[color] - entry.eg);
+  board->mg_score[color] -= entry.mg;
+  board->eg_score[color] -= entry.eg;
   board->phase -= PHASE_VALUES[piece];
   board->zobrist ^= ZOBRIST_PIECES[piece][sq];
 }
