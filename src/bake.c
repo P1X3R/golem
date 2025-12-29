@@ -8,7 +8,7 @@
 
 #include "bitboard.h"
 #include "defs.h"
-#include "rand.h"
+#include "misc.h"
 
 #define MAX_VARIANTS 4096
 
@@ -146,7 +146,7 @@ bitboard_t gen_occupancy(uint16_t variant, bitboard_t mask) {
   return occupancy;
 }
 
-FORCE_INLINE uint64_t fewbits() {
+FORCE_INLINE uint64_t fewbits(void) {
   return random_u64() & random_u64() & random_u64();
 }
 
@@ -189,7 +189,7 @@ uint64_t find_magics(const square_t sq, const bitboard_t mask, bitboard_t* used,
   return 0;
 }
 
-int main() {
+int main(void) {
   srand(time(NULL));
 
   const size_t total_sliding = 512 * NR_OF_SQUARES + 4096 * NR_OF_SQUARES;
