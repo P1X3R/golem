@@ -1,15 +1,17 @@
-CC := gcc
+CC := clang
 
 # Build mode (default = release)
 MODE ?= release
 
+COMMON_FLAGS = -Wall -Wextra -Wpedantic -std=c11 -D_POSIX_C_SOURCE=200808L
+
 ifeq ($(MODE),debug)
-    CFLAGS := -O1 -g -Wall -Wextra -Wpedantic -std=c99 \
-              -fsanitize=address,undefined -fno-omit-frame-pointer
-    LDFLAGS := -fsanitize=address,undefined
+    SANITIZERS := address,undefined
+    CFLAGS := $(COMMON_FLAGS) -O1 -g -fsanitize=$(SANITIZERS) -fno-omit-frame-pointer
+    LDFLAGS := -fsanitize=$(SANITIZERS)
 else ifeq ($(MODE),release)
-    CFLAGS := -O3 -march=native -flto -Wall -Wextra -Wpedantic -std=c99 -DNDEBUG
-    LDFLAGS :=
+    CFLAGS := $(COMMON_FLAGS) -O3 -march=native -DNDEBUG -flto
+    LDFLAGS := -flto
 else
     $(error Unknown MODE '$(MODE)' (expected 'debug' or 'release'))
 endif
