@@ -199,6 +199,8 @@ board_t from_fen(const char fen[]) {
       case 'q':
         board.rights |= RT_BQ;
         break;
+      case '-':
+        break;
       default:
         UCI_SEND("info string invalid right %c", *current);
         break;
@@ -246,7 +248,9 @@ board_t from_fen(const char fen[]) {
   /*
    * --- Half-move clock ---
    */
-  board.halfmove_clock = atoi(strtok(NULL, " "));
+  if ((token = strtok(NULL, " ")) != NULL) {
+    board.halfmove_clock = atoi(token);
+  }
 
   return board;
 }

@@ -7,8 +7,8 @@
 #define TOTAL_PHASE 24  // Phase at starting position
 
 typedef struct {
-  int16_t mg;
-  int16_t eg;
+  int mg;
+  int eg;
 } score_t;
 
 extern const score_t PSQT[NR_OF_PIECE_TYPES][NR_OF_SQUARES];

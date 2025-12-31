@@ -11,6 +11,7 @@
 #include "eval.h"
 #include "misc.h"
 #include "movegen.h"
+#include "ordering.h"
 #include "uci.h"
 
 #define TIME_CHECK_MASK 1023
@@ -80,6 +81,7 @@ void* start_search(void* params) {
     printf(" ponder %s", ponder_move_uci);
   }
   putchar('\n');
+  fflush(stdout);
 
   search_flag_store(ST_EXIT);
 
@@ -116,6 +118,13 @@ move_t iterative_deepening(search_ctx_t* ctx, move_t* ponder_move,
 int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
                const int beta) {
   const bool is_root = ply == 0;
+  board_t* board = &ctx->board;
+
+  ctx->pv.len[ply] = 0;
+  if (depth == 0) {
+    return quiescence(ctx, ply, alpha, beta);
+  }
+
   if (!is_root && (is_timeout(ctx, false) || search_flag_load() == ST_EXIT)) {
     return alpha;
   }
@@ -127,16 +136,11 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
 
   ctx->nodes++;
   ctx->seldepth = (ply > ctx->seldepth) ? ply : ctx->seldepth;
-  ctx->pv.len[ply] = 0;
 
-  board_t* board = &ctx->board;
   if (!is_root && is_draw(board)) {
     return 0;
   }
   if (ply >= MAX_PLY) {
-    return static_eval(board);
-  }
-  if (depth == 0) {
     return static_eval(board);
   }
 
@@ -145,14 +149,17 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
     depth++;
   }
 
-  const int max_mate = MATE_SCORE - ply;
-  const move_list_t move_list = gen_color_moves(board);
+  move_list_t move_list = gen_color_moves(board);
+  int scores[MAX_MOVES] = {0};
+  score_list(ctx, &move_list, scores);
 
+  const int max_mate = MATE_SCORE - ply;
   int max = -MATE_SCORE;
   uint8_t currmovenumber = 0;
   uint64_t last_currmove = is_root ? now_ms() : 0;
 
   for (uint8_t i = 0; i < move_list.len; i++) {
+    next_move(&move_list, scores, i);
     const move_t move = move_list.moves[i];
     const undo_t undo = do_move(move, board);
     if (!was_legal(move, board)) {
@@ -181,7 +188,7 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
       break;
     }
     if (search_flag_load() == ST_EXIT || is_timeout(ctx, false)) {
-      return alpha;
+      return max;
     }
   }
 
@@ -192,4 +199,64 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
     return -max_mate;
   }
   return 0;
+}
+
+int quiescence(search_ctx_t* ctx, const uint8_t ply, int alpha,
+               const int beta) {
+  if (search_flag_load() == ST_PONDERHIT) {
+    ctx->time_control.start_ms = now_ms();
+    ctx->time_control.timeout = false;
+    search_flag_store(ST_THINK);
+  }
+
+  ctx->nodes++;
+  ctx->seldepth = (ply > ctx->seldepth) ? ply : ctx->seldepth;
+
+  board_t* board = &ctx->board;
+  int max = static_eval(board);
+
+  if (ply >= MAX_PLY || is_timeout(ctx, false) ||
+      search_flag_load() == ST_EXIT) {
+    return max;
+  }
+
+  // Stand pat
+  if (max >= beta) {
+    return max;
+  }
+  if (max > alpha) {
+    alpha = max;
+  }
+
+  move_list_t move_list = gen_captures_only(board);
+  int scores[MAX_MOVES] = {0};
+  score_list(ctx, &move_list, scores);
+
+  for (uint8_t i = 0; i < move_list.len; i++) {
+    next_move(&move_list, scores, i);
+    const move_t move = move_list.moves[i];
+    const undo_t undo = do_move(move, board);
+    if (!was_legal(move, board)) {
+      undo_move(undo, move, board);
+      continue;
+    }
+
+    const int score = -quiescence(ctx, ply + 1, -beta, -alpha);
+    undo_move(undo, move, board);
+
+    if (score > max) {
+      max = score;
+      if (score > alpha) {
+        alpha = score;
+      }
+    }
+    if (alpha >= beta) {
+      break;
+    }
+    if (search_flag_load() == ST_EXIT || is_timeout(ctx, false)) {
+      return alpha;
+    }
+  }
+
+  return max;
 }

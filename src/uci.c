@@ -164,23 +164,22 @@ static void handle_go(engine_t* engine, pthread_t* worker,
   // Technically not infinite but it would search for 584,942,417 years.
   time_control_t time_control = {false, start_ms, UINT64_MAX, UINT64_MAX};
 
+  const uint64_t MOVE_OVERHEAD_MS = 50;
   if (color_time_ms > 0) {
-    const uint64_t MOVE_OVERHEAD_MS = 50;
-    uint64_t base_time = color_time_ms - MOVE_OVERHEAD_MS;
+    const uint64_t base_time = color_time_ms - MOVE_OVERHEAD_MS;
     mtg = (mtg > 0) ? mtg : 20;
     const uint64_t allocated = (base_time / mtg) + (color_inc_ms / 2);
 
     time_control.soft_ms = allocated * 8 / 10;
     time_control.hard_ms = base_time;
-    time_control.hard_ms = (time_control.hard_ms > base_time)
-                               ? color_time_ms
-                               : time_control.hard_ms;
   } else if (color_inc_ms > 0) {
     time_control.soft_ms = color_inc_ms * 8 / 10;
     time_control.hard_ms = color_inc_ms * 9 / 10;
   } else if (movetime > 0) {
-    time_control.soft_ms = movetime * 9 / 10;
-    time_control.hard_ms = movetime;
+    const uint64_t base_time =
+        (movetime <= MOVE_OVERHEAD_MS) ? 1 : movetime - MOVE_OVERHEAD_MS;
+    time_control.soft_ms = base_time * 9 / 10;
+    time_control.hard_ms = base_time;
   }
 
   *params = (uci_go_params_t){engine, time_control, depth};

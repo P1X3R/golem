@@ -61,3 +61,4 @@ move_t iterative_deepening(search_ctx_t* ctx, move_t* ponder_move,
                            uint8_t depth);
 int alpha_beta(search_ctx_t* ctx, uint8_t depth, uint8_t ply, int alpha,
                int beta);
+int quiescence(search_ctx_t* ctx, uint8_t ply, int alpha, int beta);
