@@ -25,7 +25,7 @@ static FORCE_INLINE void set_piece(board_t* board, const square_t sq,
   board->mg_score[color] += entry.mg;
   board->eg_score[color] += entry.eg;
   board->phase += PHASE_VALUES[piece];
-  board->zobrist ^= ZOBRIST_PIECES[piece][sq];
+  board->zobrist ^= ZOBRIST_PIECES[color][piece][sq];
 }
 
 static FORCE_INLINE void set_piece_no_hash(board_t* board, const square_t sq,
@@ -53,7 +53,7 @@ static FORCE_INLINE void clear_piece(board_t* board, const square_t sq,
   board->mg_score[color] -= entry.mg;
   board->eg_score[color] -= entry.eg;
   board->phase -= PHASE_VALUES[piece];
-  board->zobrist ^= ZOBRIST_PIECES[piece][sq];
+  board->zobrist ^= ZOBRIST_PIECES[color][piece][sq];
 }
 
 static FORCE_INLINE void clear_piece_no_hash(board_t* board, const square_t sq,
