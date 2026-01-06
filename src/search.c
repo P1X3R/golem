@@ -12,11 +12,20 @@
 #include "misc.h"
 #include "movegen.h"
 #include "ordering.h"
+#include "transposition.h"
 #include "uci.h"
 
 #define TIME_CHECK_MASK 1023
 
 volatile _Atomic search_flag_t SEARCH_FLAG = ST_EXIT;
+
+static FORCE_INLINE void check_ponderhit(search_ctx_t* ctx) {
+  if (search_flag_load() == ST_PONDERHIT) {
+    ctx->time_control.start_ms = now_ms();
+    ctx->time_control.timeout = false;
+    search_flag_store(ST_THINK);
+  }
+}
 
 static FORCE_INLINE void pv_update(pv_table_t* pv, const uint8_t ply,
                                    const move_t best_move) {
@@ -83,6 +92,7 @@ void* start_search(void* params) {
   putchar('\n');
   fflush(stdout);
 
+  tt_update();
   search_flag_store(ST_EXIT);
 
   return NULL;
@@ -90,8 +100,6 @@ void* start_search(void* params) {
 
 move_t iterative_deepening(search_ctx_t* ctx, move_t* ponder_move,
                            const uint8_t depth) {
-  assert(depth < MAX_PLY);
-
   move_t best_move = 0;
 
   for (uint8_t curr_depth = 1; curr_depth <= depth; curr_depth++) {
@@ -99,13 +107,14 @@ move_t iterative_deepening(search_ctx_t* ctx, move_t* ponder_move,
 
     if (search_flag_load() == ST_EXIT || is_timeout(ctx, true)) {
       if (curr_depth <= 1) {
-        send_info_depth(ctx, curr_depth, score);
         best_move = ctx->pv.table[0][0];
+        send_info_depth(ctx, curr_depth, score);
       }
       break;
     }
 
     best_move = ctx->pv.table[0][0];
+    *ponder_move = 0;
     if (ctx->pv.len[0] >= 2) {
       *ponder_move = ctx->pv.table[0][1];
     }
@@ -117,31 +126,41 @@ move_t iterative_deepening(search_ctx_t* ctx, move_t* ponder_move,
 
 int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
                const int beta) {
-  const bool is_root = ply == 0;
-  board_t* board = &ctx->board;
-
   ctx->pv.len[ply] = 0;
   if (depth == 0) {
     return quiescence(ctx, ply, alpha, beta);
   }
 
-  if (!is_root && (is_timeout(ctx, false) || search_flag_load() == ST_EXIT)) {
-    return alpha;
-  }
-  if (search_flag_load() == ST_PONDERHIT) {
-    ctx->time_control.start_ms = now_ms();
-    ctx->time_control.timeout = false;
-    search_flag_store(ST_THINK);
-  }
+  const bool is_root = ply == 0;
+  board_t* board = &ctx->board;
+
+  check_ponderhit(ctx);
 
   ctx->nodes++;
   ctx->seldepth = (ply > ctx->seldepth) ? ply : ctx->seldepth;
 
-  if (!is_root && is_draw(board)) {
-    return 0;
-  }
-  if (ply >= MAX_PLY) {
-    return static_eval(board);
+  tt_prefetch(board->zobrist);
+  const tt_entry_t tt_entry = tt_probe(board->zobrist);
+
+  if (!is_root) {
+    if (is_draw(board)) {
+      return 0;
+    }
+
+    if (tt_entry.bound != BOUND_NONE && tt_entry.depth >= depth) {
+      const int score = decode_mate(tt_entry.score, ply);
+
+      if (tt_entry.bound == BOUND_EXACT ||
+          (tt_entry.bound == BOUND_LOWER && score >= beta) ||
+          (tt_entry.bound == BOUND_UPPER && score <= alpha)) {
+        return score;
+      }
+    }
+
+    if (ply >= MAX_PLY || is_timeout(ctx, false) ||
+        search_flag_load() == ST_EXIT) {
+      return static_eval(board);
+    }
   }
 
   const bool checked = in_check(board);
@@ -149,11 +168,13 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
     depth++;
   }
 
+  const int alpha_original = alpha;
   move_list_t move_list = gen_color_moves(board);
   int scores[MAX_MOVES] = {0};
-  score_list(ctx, &move_list, scores);
+  score_list(ctx, &move_list, &tt_entry, scores);
 
   const int max_mate = MATE_SCORE - ply;
+  move_t best_move = 0;
   int max = -MATE_SCORE;
   uint8_t currmovenumber = 0;
   uint64_t last_currmove = is_root ? now_ms() : 0;
@@ -179,6 +200,7 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
 
     if (score > max) {
       max = score;
+      best_move = move;
       if (score > alpha) {
         pv_update(&ctx->pv, ply, move);
         alpha = score;
@@ -193,21 +215,30 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
   }
 
   if (currmovenumber) {
+    uint8_t bound;
+    if (max <= alpha_original) {
+      bound = BOUND_UPPER;
+    } else if (max >= beta) {
+      bound = BOUND_LOWER;
+    } else {
+      bound = BOUND_EXACT;
+    }
+
+    tt_store(board->zobrist, best_move, max, depth, ply, bound);
+
     return max;
   }
+
   if (checked) {
     return -max_mate;
+  } else {
+    return 0;
   }
-  return 0;
 }
 
 int quiescence(search_ctx_t* ctx, const uint8_t ply, int alpha,
                const int beta) {
-  if (search_flag_load() == ST_PONDERHIT) {
-    ctx->time_control.start_ms = now_ms();
-    ctx->time_control.timeout = false;
-    search_flag_store(ST_THINK);
-  }
+  check_ponderhit(ctx);
 
   ctx->nodes++;
   ctx->seldepth = (ply > ctx->seldepth) ? ply : ctx->seldepth;
@@ -230,7 +261,7 @@ int quiescence(search_ctx_t* ctx, const uint8_t ply, int alpha,
 
   move_list_t move_list = gen_captures_only(board);
   int scores[MAX_MOVES] = {0};
-  score_list(ctx, &move_list, scores);
+  score_list(ctx, &move_list, NULL, scores);
 
   for (uint8_t i = 0; i < move_list.len; i++) {
     next_move(&move_list, scores, i);
@@ -254,7 +285,7 @@ int quiescence(search_ctx_t* ctx, const uint8_t ply, int alpha,
       break;
     }
     if (search_flag_load() == ST_EXIT || is_timeout(ctx, false)) {
-      return alpha;
+      return max;
     }
   }
 

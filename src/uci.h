@@ -1,6 +1,8 @@
 #pragma once
 
 #include <stdio.h>
+
+#include "bitboard.h"
 #include "defs.h"
 #include "search.h"
 
@@ -12,8 +14,8 @@
   } while (0)
 
 FORCE_INLINE void square_to_uci(const square_t sq, char out[2]) {
-  out[0] = (char)('a' + (sq & 7));
-  out[1] = (char)('1' + (sq >> 3));
+  out[0] = (char)('a' + get_file(sq));
+  out[1] = (char)('1' + get_rank(sq));
 }
 
 FORCE_INLINE char promo_to_char(const piece_t piece) {
@@ -33,15 +35,18 @@ FORCE_INLINE char promo_to_char(const piece_t piece) {
 
 FORCE_INLINE void move_to_uci(const move_t move, char out[6]) {
   if (move == 0) {
-    out = "0000\0\0";
+    out[0] = '0';
+    out[1] = '0';
+    out[2] = '0';
+    out[3] = '0';
+    out[4] = '\0';
+    return;
   }
 
-  square_t from = get_from(move);
-  square_t to = get_to(move);
-  uint8_t flags = get_flags(move);
+  const uint8_t flags = get_flags(move);
 
-  square_to_uci(from, out);
-  square_to_uci(to, out + 2);
+  square_to_uci(get_from(move), out);
+  square_to_uci(get_to(move), out + 2);
 
   uint8_t len = 4;
 

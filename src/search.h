@@ -7,7 +7,7 @@
 #include "defs.h"
 
 #define MAX_PLY 128
-#define MATE_SCORE 30000
+#define MATE_SCORE 32000
 #define MATE_THRESHOLD (MATE_SCORE - (MAX_PLY * 2))
 
 typedef struct {

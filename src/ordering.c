@@ -2,9 +2,10 @@
 
 #include "defs.h"
 #include "search.h"
+#include "transposition.h"
 
 static const int PIECE_SCORE[NR_OF_PIECE_TYPES + 1] = {
-    100, 300, 325, 500, 900, 0,
+    100, 300, 325, 500, 900, 0, 0,
 };
 static const int MVV_LVA[NR_OF_PIECE_TYPES][NR_OF_PIECE_TYPES] = {
     {109, 107, 107, 105, 101, 0}, {309, 307, 307, 305, 301, 0},
@@ -12,7 +13,13 @@ static const int MVV_LVA[NR_OF_PIECE_TYPES][NR_OF_PIECE_TYPES] = {
     {909, 907, 907, 905, 901, 0}, {0, 0, 0, 0, 0, 0},
 };
 
-static FORCE_INLINE int score_move(const move_t move, const search_ctx_t* ctx) {
+static FORCE_INLINE int score_move(const move_t move,
+                                   const search_ctx_t* __restrict ctx,
+                                   const tt_entry_t* __restrict entry) {
+  if (entry != NULL && entry->best_move == move) {
+    return 10000;
+  }
+
   const uint8_t flags = get_flags(move);
 
   if (flags & FLAG_CAPTURE) {
@@ -31,9 +38,9 @@ static FORCE_INLINE int score_move(const move_t move, const search_ctx_t* ctx) {
 
 void score_list(const search_ctx_t* __restrict ctx,
                 const move_list_t* __restrict move_list,
-                int scores[MAX_MOVES]) {
+                const tt_entry_t* __restrict entry, int scores[MAX_MOVES]) {
   for (uint8_t i = 0; i < move_list->len; i++) {
-    scores[i] = score_move(move_list->moves[i], ctx);
+    scores[i] = score_move(move_list->moves[i], ctx, entry);
   }
 }
 

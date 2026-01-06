@@ -5,6 +5,7 @@
 #include <stdatomic.h>
 #include <stdint.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 #include "board.h"
@@ -12,6 +13,7 @@
 #include "misc.h"
 #include "movegen.h"
 #include "search.h"
+#include "transposition.h"
 
 #define LINE_BUF_LEN 8192
 #define FEN_BUF_LEN 128
@@ -164,14 +166,16 @@ static void handle_go(engine_t* engine, pthread_t* worker,
   // Technically not infinite but it would search for 584,942,417 years.
   time_control_t time_control = {false, start_ms, UINT64_MAX, UINT64_MAX};
 
-  const uint64_t MOVE_OVERHEAD_MS = 50;
+  const uint64_t MOVE_OVERHEAD_MS = 100;
   if (color_time_ms > 0) {
     const uint64_t base_time = color_time_ms - MOVE_OVERHEAD_MS;
     mtg = (mtg > 0) ? mtg : 20;
     const uint64_t allocated = (base_time / mtg) + (color_inc_ms / 2);
 
     time_control.soft_ms = allocated * 8 / 10;
-    time_control.hard_ms = base_time;
+    time_control.hard_ms = allocated * 12 / 10;
+    time_control.hard_ms =
+        (time_control.hard_ms > base_time) ? base_time : time_control.hard_ms;
   } else if (color_inc_ms > 0) {
     time_control.soft_ms = color_inc_ms * 8 / 10;
     time_control.hard_ms = color_inc_ms * 9 / 10;
@@ -230,7 +234,8 @@ void uci_loop(engine_t* engine) {
         search_flag_store(ST_PONDERHIT);
       }
     } else if (strcmp(token, "ucinewgame") == 0) {
-      // Do nothing :p
+      stop_worker();
+      tt_init(DEFAULT_TT_SIZE);
     } else if (strcmp(token, "setoption") == 0) {
       // TODO
     } else if (strcmp(token, "board") == 0) {
@@ -251,9 +256,9 @@ void send_info_depth(search_ctx_t* ctx, const uint8_t depth, const int score) {
   const uint64_t nps = (ctx->nodes * 1000) / search_duration_ms;
 
   printf("info depth %d seldepth %d score %s %d time %" PRIu64 " nodes %" PRIu64
-         " nps %" PRIu64 " pv ",
+         " nps %" PRIu64 " hashfull %d pv ",
          depth, ctx->seldepth, (abs(score) > MATE_THRESHOLD) ? "mate" : "cp",
-         encoded_score, search_duration_ms, ctx->nodes, nps);
+         encoded_score, search_duration_ms, ctx->nodes, nps, get_hashfull());
 
   for (uint8_t i = 0; i < ctx->pv.len[0]; i++) {
     const move_t move = ctx->pv.table[0][i];
