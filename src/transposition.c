@@ -21,14 +21,18 @@ void tt_prefetch(const uint64_t hash) {
 }
 
 void tt_clear(void) {
+  if (tt.buckets == NULL) {
+    return;
+  }
+
+  memset(tt.buckets, 0, (tt.mask + 1) * sizeof(tt_bucket_t));
+}
+
+void tt_init(size_t mb) {
   if (tt.buckets) {
     free(tt.buckets);
     tt = (t_table_t){NULL, 0, 0};
   }
-}
-
-void tt_init(size_t mb) {
-  tt_clear();
 
   if (mb < 2) {
     mb = 2;  // 2 MB minimum
@@ -49,8 +53,7 @@ void tt_init(size_t mb) {
     return;
   }
 
-  // Clear the table
-  memset(tt.buckets, 0, buckets * sizeof(tt_bucket_t));
+  tt_clear();
 }
 
 uint16_t get_hashfull(void) {

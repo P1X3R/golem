@@ -18,6 +18,8 @@
 #define LINE_BUF_LEN 8192
 #define FEN_BUF_LEN 128
 
+uint64_t move_overhead_ms = 300;
+
 static void stop_worker(void) { search_flag_store(ST_EXIT); }
 
 static bool parse_fen_tokens(char* fen, char** saveptr) {
@@ -166,9 +168,8 @@ static void handle_go(engine_t* engine, pthread_t* worker,
   // Technically not infinite but it would search for 584,942,417 years.
   time_control_t time_control = {false, start_ms, UINT64_MAX, UINT64_MAX};
 
-  const uint64_t MOVE_OVERHEAD_MS = 100;
   if (color_time_ms > 0) {
-    const uint64_t base_time = color_time_ms - MOVE_OVERHEAD_MS;
+    const uint64_t base_time = color_time_ms - move_overhead_ms;
     mtg = (mtg > 0) ? mtg : 20;
     const uint64_t allocated = (base_time / mtg) + (color_inc_ms / 2);
 
@@ -181,7 +182,7 @@ static void handle_go(engine_t* engine, pthread_t* worker,
     time_control.hard_ms = color_inc_ms * 9 / 10;
   } else if (movetime > 0) {
     const uint64_t base_time =
-        (movetime <= MOVE_OVERHEAD_MS) ? 1 : movetime - MOVE_OVERHEAD_MS;
+        (movetime <= move_overhead_ms) ? 1 : movetime - move_overhead_ms;
     time_control.soft_ms = base_time * 9 / 10;
     time_control.hard_ms = base_time;
   }
@@ -195,6 +196,65 @@ static void handle_go(engine_t* engine, pthread_t* worker,
   if (pthread_detach(*worker) != 0) {
     UCI_SEND("info string error detaching search thread");
   }
+}
+
+static void handle_option(char** saveptr) {
+  char* token = strtok_r(NULL, " ", saveptr);  // should be "name"
+  if (!token || strcmp(token, "name") != 0) {
+    goto bad_argument;
+  }
+
+  // collect option name until "value"
+  char option_name[128] = {0};
+  while ((token = strtok_r(NULL, " ", saveptr)) != NULL &&
+         strcmp(token, "value") != 0) {
+    if (option_name[0]) {
+      strcat(option_name, " ");
+    }
+    strcat(option_name, token);
+  }
+
+  if (!token) {
+    goto bad_argument;  // no "value" found
+  }
+
+  token = strtok_r(NULL, " ", saveptr);  // the actual value
+  if (!token) {
+    goto bad_argument;
+  }
+
+  const int val = atoi(token);
+
+  if (strcmp(option_name, "Hash") == 0) {
+    if (val < 2) {
+      UCI_SEND("info string Hash has to be at least 2 mb, using default 32 mb");
+      tt_init(DEFAULT_TT_SIZE);
+    } else if (val > 1024) {
+      UCI_SEND("info string Hash capped at 1024 mb");
+      tt_init(1024);
+    } else {
+      tt_init(val);
+    }
+    return;
+  } else if (strcmp(option_name, "MoveOverhead") == 0) {
+    if (val < 0) {
+      UCI_SEND(
+          "info string MoveOverhead cannot be negative, using default 300");
+      move_overhead_ms = 300;
+    } else if (val > 10000) {
+      UCI_SEND("info string MoveOverhead capped at 10000 ms");
+      move_overhead_ms = 10000;
+    } else {
+      move_overhead_ms = val;
+    }
+    return;
+  } else if (strcmp(option_name, "Ponder") == 0) {
+    // Pondering is always enabled
+    return;
+  }
+
+bad_argument:
+  UCI_SEND("info string unknown option argument");
 }
 
 void uci_loop(engine_t* engine) {
@@ -214,6 +274,9 @@ void uci_loop(engine_t* engine) {
       UCI_SEND("id name Golem");
       UCI_SEND("id author P1x3r");
       UCI_SEND("option name Ponder type check default false");
+      UCI_SEND("option name Hash type spin default 32 min 2 max 1024");
+      UCI_SEND(
+          "option name MoveOverhead type spin default 300 min 0 max 10000");
       UCI_SEND("uciok");
     } else if (strcmp(token, "isready") == 0) {
       stop_worker();
@@ -235,9 +298,9 @@ void uci_loop(engine_t* engine) {
       }
     } else if (strcmp(token, "ucinewgame") == 0) {
       stop_worker();
-      tt_init(DEFAULT_TT_SIZE);
+      tt_clear();
     } else if (strcmp(token, "setoption") == 0) {
-      // TODO
+      handle_option(&saveptr);
     } else if (strcmp(token, "board") == 0) {
       print_board(&engine->board);
     } else {
