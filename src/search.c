@@ -131,6 +131,7 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
     return quiescence(ctx, ply, alpha, beta);
   }
 
+  const bool is_pv = alpha != beta - 1;
   const bool is_root = ply == 0;
   board_t* board = &ctx->board;
 
@@ -151,8 +152,8 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
       const int score = decode_mate(tt_entry.score, ply);
 
       if (tt_entry.bound == BOUND_EXACT ||
-          (tt_entry.bound == BOUND_LOWER && score >= beta) ||
-          (tt_entry.bound == BOUND_UPPER && score <= alpha)) {
+          (!is_pv && tt_entry.bound == BOUND_LOWER && score >= beta) ||
+          (!is_pv && tt_entry.bound == BOUND_UPPER && score <= alpha)) {
         return score;
       }
     }
@@ -174,6 +175,7 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
   score_list(ctx, &move_list, &tt_entry, scores);
 
   const int max_mate = MATE_SCORE - ply;
+  bool found_pv = false;
   move_t best_move = 0;
   int max = -MATE_SCORE;
   uint8_t currmovenumber = 0;
@@ -195,7 +197,16 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
       send_info_currmove(move, currmovenumber);
     }
 
-    const int score = -alpha_beta(ctx, depth - 1, ply + 1, -beta, -alpha);
+    int score;
+    if (!found_pv) {
+      score = -alpha_beta(ctx, depth - 1, ply + 1, -beta, -alpha);
+    } else {
+      score = -alpha_beta(ctx, depth - 1, ply + 1, -alpha - 1, -alpha);
+      if (score > alpha && score < beta) {
+        score = -alpha_beta(ctx, depth - 1, ply + 1, -beta, -alpha);
+      }
+    }
+
     undo_move(undo, move, board);
 
     if (score > max) {
@@ -203,6 +214,7 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
       best_move = move;
       if (score > alpha) {
         pv_update(&ctx->pv, ply, move);
+        found_pv = true;
         alpha = score;
       }
     }
