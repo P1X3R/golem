@@ -66,6 +66,7 @@ void* start_search(void* params) {
       .pv = (pv_table_t){{{0}}, {0}},
       .time_control = p.time_control,
       .nodes = 0,
+      .killers = {{0}},
       .seldepth = 0,
   };
 
@@ -96,6 +97,14 @@ void* start_search(void* params) {
   search_flag_store(ST_EXIT);
 
   return NULL;
+}
+
+static void update_killers(search_ctx_t* ctx, const uint8_t ply,
+                           const move_t move) {
+  if (ctx->killers[ply][0] != move) {
+    ctx->killers[ply][1] = ctx->killers[ply][0];
+    ctx->killers[ply][0] = move;
+  }
 }
 
 move_t iterative_deepening(search_ctx_t* ctx, move_t* ponder_move,
@@ -172,7 +181,7 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
   const int alpha_original = alpha;
   move_list_t move_list = gen_color_moves(board);
   int scores[MAX_MOVES] = {0};
-  score_list(ctx, &move_list, &tt_entry, scores);
+  score_list(ctx, &move_list, &tt_entry, ply, scores);
 
   const int max_mate = MATE_SCORE - ply;
   bool found_pv = false;
@@ -219,6 +228,9 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
       }
     }
     if (alpha >= beta) {
+      if (!(get_flags(move) & FLAG_CAPTURE)) {
+        update_killers(ctx, ply, move);
+      }
       break;
     }
     if (search_flag_load() == ST_EXIT || is_timeout(ctx, false)) {
@@ -273,7 +285,7 @@ int quiescence(search_ctx_t* ctx, const uint8_t ply, int alpha,
 
   move_list_t move_list = gen_captures_only(board);
   int scores[MAX_MOVES] = {0};
-  score_list(ctx, &move_list, NULL, scores);
+  score_list(ctx, &move_list, NULL, ply, scores);
 
   for (uint8_t i = 0; i < move_list.len; i++) {
     next_move(&move_list, scores, i);

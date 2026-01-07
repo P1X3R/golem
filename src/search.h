@@ -21,9 +21,12 @@ typedef struct {
   uint64_t soft_ms, hard_ms;
 } time_control_t;
 
+typedef move_t killers_t[MAX_PLY][2];
+
 typedef struct {
   board_t board;
   pv_table_t pv;
+  killers_t killers;
   time_control_t time_control;
   uint64_t nodes;
   uint8_t seldepth;

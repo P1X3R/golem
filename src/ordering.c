@@ -15,9 +15,10 @@ static const int MVV_LVA[NR_OF_PIECE_TYPES][NR_OF_PIECE_TYPES] = {
 
 static FORCE_INLINE int score_move(const move_t move,
                                    const search_ctx_t* __restrict ctx,
-                                   const tt_entry_t* __restrict entry) {
+                                   const tt_entry_t* __restrict entry,
+                                   const uint8_t ply) {
   if (entry != NULL && entry->best_move == move) {
-    return 10000;
+    return 30000;
   }
 
   const uint8_t flags = get_flags(move);
@@ -30,7 +31,18 @@ static FORCE_INLINE int score_move(const move_t move,
                       (flags == FLAG_EP) ? PT_PAWN : ctx->board.mailbox[to],
                   attacker = ctx->board.mailbox[from];
 
-    return MVV_LVA[victim][attacker] + PIECE_SCORE[promotion];
+    return 20000 + MVV_LVA[victim][attacker] + PIECE_SCORE[promotion];
+  }
+
+  if (flags & FLAG_PROMOTION) {
+    const piece_t promotion = decode_promotion(flags);
+    return 20000 + PIECE_SCORE[promotion];
+  }
+
+  if (ctx->killers[ply][0] == move) {
+    return 9000;
+  } else if (ctx->killers[ply][1] == move) {
+    return 8000;
   }
 
   return 0;
@@ -38,9 +50,10 @@ static FORCE_INLINE int score_move(const move_t move,
 
 void score_list(const search_ctx_t* __restrict ctx,
                 const move_list_t* __restrict move_list,
-                const tt_entry_t* __restrict entry, int scores[MAX_MOVES]) {
+                const tt_entry_t* __restrict entry, const uint8_t ply,
+                int scores[MAX_MOVES]) {
   for (uint8_t i = 0; i < move_list->len; i++) {
-    scores[i] = score_move(move_list->moves[i], ctx, entry);
+    scores[i] = score_move(move_list->moves[i], ctx, entry, ply);
   }
 }
 
