@@ -1,6 +1,7 @@
 #include <stdint.h>
 
 #include "defs.h"
+#include "history.h"
 #include "search.h"
 #include "transposition.h"
 
@@ -40,12 +41,12 @@ static FORCE_INLINE int score_move(const move_t move,
   }
 
   if (ctx->killers[ply][0] == move) {
-    return 9000;
+    return 10000;
   } else if (ctx->killers[ply][1] == move) {
-    return 8000;
+    return 9000;
   }
 
-  return 0;
+  return *hh_get(move, &ctx->board);
 }
 
 void score_list(const search_ctx_t* __restrict ctx,

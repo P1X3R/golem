@@ -10,6 +10,7 @@
 
 #include "board.h"
 #include "defs.h"
+#include "history.h"
 #include "misc.h"
 #include "movegen.h"
 #include "search.h"
@@ -298,6 +299,7 @@ void uci_loop(engine_t* engine) {
       }
     } else if (strcmp(token, "ucinewgame") == 0) {
       stop_worker();
+      hh_clear();
       tt_clear();
     } else if (strcmp(token, "setoption") == 0) {
       handle_option(&saveptr);

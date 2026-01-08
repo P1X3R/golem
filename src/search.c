@@ -9,6 +9,7 @@
 #include "board.h"
 #include "defs.h"
 #include "eval.h"
+#include "history.h"
 #include "misc.h"
 #include "movegen.h"
 #include "ordering.h"
@@ -99,11 +100,26 @@ void* start_search(void* params) {
   return NULL;
 }
 
-static void update_killers(search_ctx_t* ctx, const uint8_t ply,
-                           const move_t move) {
+static void update_heuristics(search_ctx_t* __restrict ctx, const uint8_t ply,
+                              const uint8_t depth, const move_t move,
+                              const uint8_t idx,
+                              const move_list_t* __restrict move_list,
+                              const move_t hash_move) {
   if (ctx->killers[ply][0] != move) {
     ctx->killers[ply][1] = ctx->killers[ply][0];
     ctx->killers[ply][0] = move;
+  }
+
+  const int bonus = depth * depth;
+  hh_update(move, bonus, &ctx->board);
+
+  // Apply history maluses
+  for (uint8_t i = 0; i < idx; i++) {
+    const move_t quiet_move = move_list->moves[i];
+    if (!(get_flags(quiet_move) & FLAG_CAPTURE) &&
+        quiet_move != ctx->killers[ply][1] && quiet_move != hash_move) {
+      hh_update(quiet_move, -bonus, &ctx->board);
+    }
   }
 }
 
@@ -229,7 +245,8 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
     }
     if (alpha >= beta) {
       if (!(get_flags(move) & FLAG_CAPTURE)) {
-        update_killers(ctx, ply, move);
+        update_heuristics(ctx, ply, depth, move, i, &move_list,
+                          tt_entry.best_move);
       }
       break;
     }
