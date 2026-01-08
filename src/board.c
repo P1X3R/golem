@@ -488,6 +488,34 @@ void undo_move(const undo_t undo, const move_t move, board_t* board) {
   }
 }
 
+square_t do_null_move(board_t* board) {
+  const square_t ep_target = board->ep_target;
+
+  if (board->ep_target != SQ_NONE) {
+    board->zobrist ^= ZOBRIST_EP_FILE[get_file(board->ep_target)];
+    board->ep_target = SQ_NONE;
+  }
+
+  board->side_to_move ^= 1;
+  board->zobrist ^= ZOBRIST_COLOR;
+
+  board->history[board->num_moves++] = board->zobrist;
+
+  return ep_target;
+}
+
+void undo_null_move(const square_t ep_target, board_t* board) {
+  board->num_moves--;
+
+  if (ep_target != SQ_NONE) {
+    board->zobrist ^= ZOBRIST_EP_FILE[get_file(ep_target)];
+    board->ep_target = ep_target;
+  }
+
+  board->side_to_move ^= 1;
+  board->zobrist ^= ZOBRIST_COLOR;
+}
+
 FORCE_INLINE bool is_draw_by_repetition(const board_t* board) {
   unsigned reps = 0;
   const int start = board->num_moves - 1;

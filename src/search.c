@@ -167,6 +167,7 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
 
   tt_prefetch(board->zobrist);
   const tt_entry_t tt_entry = tt_probe(board->zobrist);
+  int tt_score = -MATE_SCORE;
 
   if (!is_root) {
     if (is_draw(board)) {
@@ -174,12 +175,11 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
     }
 
     if (tt_entry.bound != BOUND_NONE && tt_entry.depth >= depth) {
-      const int score = decode_mate(tt_entry.score, ply);
-
+      tt_score = decode_mate(tt_entry.score, ply);
       if (tt_entry.bound == BOUND_EXACT ||
-          (!is_pv && tt_entry.bound == BOUND_LOWER && score >= beta) ||
-          (!is_pv && tt_entry.bound == BOUND_UPPER && score <= alpha)) {
-        return score;
+          (!is_pv && tt_entry.bound == BOUND_LOWER && tt_score >= beta) ||
+          (!is_pv && tt_entry.bound == BOUND_UPPER && tt_score <= alpha)) {
+        return tt_score;
       }
     }
 
@@ -192,6 +192,32 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
   const bool checked = in_check(board);
   if (checked && depth < MAX_PLY - 1) {
     depth++;
+  }
+
+  // Null move pruning
+  const bitboard_t non_pawn_material =
+      board->occupancies[board->side_to_move] &
+      ~(board->bitboards[PT_PAWN] | board->bitboards[PT_KING]);
+  if (depth >= 3 && !is_root && !is_pv && !checked &&
+      (tt_entry.bound == BOUND_NONE || tt_entry.bound != BOUND_UPPER ||
+       tt_score >= beta) &&
+      non_pawn_material) {
+    const square_t ep_target = do_null_move(board);
+
+    const uint8_t R = depth > 6 ? 4 : 3;
+    int next_depth = (int)depth - 1 - R;
+    if (next_depth < 0) {
+      next_depth = 0;
+    }
+
+    const int score = -alpha_beta(ctx, next_depth, ply + 1, -beta, -beta + 1);
+
+    undo_null_move(ep_target, board);
+
+    // Don't return mates
+    if (score >= beta) {
+      return (score >= MATE_THRESHOLD) ? beta : score;
+    }
   }
 
   const int alpha_original = alpha;

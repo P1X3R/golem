@@ -29,5 +29,7 @@ bool was_legal(move_t move, const board_t* board);
 bool in_check(const board_t* board);
 undo_t do_move(move_t move, board_t* board);
 void undo_move(undo_t undo, move_t move, board_t* board);
+square_t do_null_move(board_t* board);
+void undo_null_move(square_t ep_target, board_t* board);
 bool is_draw(const board_t* board);
 void print_board(const board_t* board);
