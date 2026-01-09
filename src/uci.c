@@ -19,7 +19,7 @@
 #define LINE_BUF_LEN 8192
 #define FEN_BUF_LEN 128
 
-uint64_t move_overhead_ms = 300;
+uint64_t move_overhead_ms = 100;
 
 static void stop_worker(void) { search_flag_store(ST_EXIT); }
 
@@ -240,8 +240,8 @@ static void handle_option(char** saveptr) {
   } else if (strcmp(option_name, "MoveOverhead") == 0) {
     if (val < 0) {
       UCI_SEND(
-          "info string MoveOverhead cannot be negative, using default 300");
-      move_overhead_ms = 300;
+          "info string MoveOverhead cannot be negative, using default 100");
+      move_overhead_ms = 100;
     } else if (val > 10000) {
       UCI_SEND("info string MoveOverhead capped at 10000 ms");
       move_overhead_ms = 10000;
@@ -277,7 +277,7 @@ void uci_loop(engine_t* engine) {
       UCI_SEND("option name Ponder type check default false");
       UCI_SEND("option name Hash type spin default 32 min 2 max 1024");
       UCI_SEND(
-          "option name MoveOverhead type spin default 300 min 0 max 10000");
+          "option name MoveOverhead type spin default 100 min 0 max 10000");
       UCI_SEND("uciok");
     } else if (strcmp(token, "isready") == 0) {
       stop_worker();
