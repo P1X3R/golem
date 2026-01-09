@@ -21,7 +21,5 @@ make
 
 That's it.
 
-## Status
-
-This project is experimental but stable.
-APIs and internal architecture may change as search and evaluation improve.
+## License
+This project is licensed under the MIT License. See the LICENSE file for details.
