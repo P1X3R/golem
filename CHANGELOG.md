@@ -9,6 +9,8 @@
 - Remove ghost main.c file
 - Add license
 - Update changelog and major version
+- Change default MoveOverhead to 100 ms
+- Improve Windows compatibility and fix warnings in gcc
 ## [1.3.0] - 2026-01-08
 
 ### 🚀 Features

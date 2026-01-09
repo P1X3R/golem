@@ -2,6 +2,7 @@
 
 #include <assert.h>
 #include <ctype.h>
+#include <inttypes.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -600,6 +601,6 @@ void print_board(const board_t* board) {
   }
 
   printf("Halfmove: %d\n", board->halfmove_clock);
-  printf("Zobrist: 0x%016lx\n", board->zobrist);
+  printf("Zobrist: 0x%016" PRIx64 "\n", board->zobrist);
   printf("\n");
 }

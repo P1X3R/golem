@@ -7,6 +7,8 @@
 #include <string.h>
 
 #include "defs.h"
+#include "misc.h"
+#include "uci.h"
 
 #define MB_SCALE ((size_t)1 << 20)
 #define AGE_SHIFT 1
@@ -30,7 +32,7 @@ void tt_clear(void) {
 
 void tt_init(size_t mb) {
   if (tt.buckets) {
-    free(tt.buckets);
+    aligned_free(tt.buckets);
     tt = (t_table_t){NULL, 0, 0};
   }
 
@@ -41,13 +43,20 @@ void tt_init(size_t mb) {
   }
 
   const size_t bytes = mb * MB_SCALE;
-  const size_t buckets = (size_t)1
-                         << (8 * sizeof(size_t) - 1 -
-                             __builtin_clzl(bytes / sizeof(tt_bucket_t)));
+  size_t entries = bytes / sizeof(tt_bucket_t);
+  if (entries < 1) {
+    entries = 1;
+  }
+
+  size_t buckets = 1;
+  while ((buckets << 1) <= entries) {
+    buckets <<= 1;
+  }
 
   tt.mask = buckets - 1;
-  if (posix_memalign((void**)&tt.buckets, 64, buckets * sizeof(tt_bucket_t)) !=
+  if (aligned_alloc_64((void**)&tt.buckets, buckets * sizeof(tt_bucket_t)) !=
       0) {
+    UCI_SEND("info string failed to allocate TT");
     tt.buckets = NULL;
     tt.mask = 0;
     return;
@@ -78,7 +87,7 @@ tt_entry_t tt_probe(const uint64_t zobrist) {
     return (tt_entry_t){0, 0, 0, 0, BOUND_NONE, 0};
   }
 
-  const tt_bucket_t* bucket = &tt.buckets[zobrist & tt.mask];
+  tt_bucket_t* bucket = &tt.buckets[zobrist & tt.mask];
   for (uint8_t i = 0; i < BUCKETS_LEN; i++) {
     const tt_entry_t entry = (*bucket)[i];
     if (entry.key == zobrist && entry.bound != BOUND_NONE) {
