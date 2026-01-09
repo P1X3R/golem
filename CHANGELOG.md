@@ -1,4 +1,63 @@
-## [1.0] - 2026-01-07
+## [1.3.1] - 2026-01-09
+
+### 🚜 Refactor
+
+- Refine quiet move detection
+
+### ⚙️ Miscellaneous Tasks
+
+- Remove ghost main.c file
+- Add license
+- Update changelog and major version
+## [1.3.0] - 2026-01-08
+
+### 🚀 Features
+
+- *(search)* Add null-move pruning
+## [1.2.0] - 2026-01-08
+
+### 🚀 Features
+
+- *(ordering)* Add history heuristics
+## [1.1.0] - 2026-01-07
+
+### 🚀 Features
+
+- *(ordering)* Add killer moves
+## [1.0.0] - 2026-01-07
+
+### ⚙️ Miscellaneous Tasks
+
+- Add changelog and version to `uci`
+## [0.4.1] - 2026-01-07
+
+### 🚀 Features
+
+- *(uci)* Add `setoption`
+
+### ⚙️ Miscellaneous Tasks
+
+- Add a readme
+## [0.4.0] - 2026-01-07
+
+### 🚀 Features
+
+- Add PVS
+## [0.3.0] - 2026-01-06
+
+### 🚀 Features
+
+- Add transposition tables
+
+### 🐛 Bug Fixes
+
+- Add color for ZOBRIST_PIECES
+## [0.2.0] - 2025-12-31
+
+### 🚀 Features
+
+- *(search)* Add quiescence search and move ordering
+## [0.1.0] - 2025-12-29
 
 ### 🚀 Features
 
@@ -14,15 +73,10 @@
 - Add draw detection and history tracking; refactor move generation
 - Add incremental evaluation function
 - *(search,uci)* Implement alpha-beta search and UCI protocol
-- *(search)* Add quiescence search and move ordering
-- Add transposition tables
-- Add PVS
-- *(uci)* Add `setoption`
 
 ### 🐛 Bug Fixes
 
 - *(board)* Update castling rights when a rook captures another rook
-- Add color for ZOBRIST_PIECES
 
 ### 💼 Other
 
@@ -50,4 +104,3 @@
 - Add .clang-format
 - Add makefile
 - Include .cache in .gitignore
-- Add a readme
