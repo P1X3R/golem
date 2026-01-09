@@ -5,7 +5,7 @@
 
 #include "defs.h"
 
-history_h_t hh = {{0}};
+history_h_t hh = {0};
 
 void hh_update(const move_t move, const int bonus, const board_t* board) {
   const int clamped_bonus = (bonus < -HISTORY_MAX)  ? -HISTORY_MAX
