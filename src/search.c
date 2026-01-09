@@ -116,8 +116,8 @@ static void update_heuristics(search_ctx_t* __restrict ctx, const uint8_t ply,
   // Apply history maluses
   for (uint8_t i = 0; i < idx; i++) {
     const move_t quiet_move = move_list->moves[i];
-    if (!(get_flags(quiet_move) & FLAG_CAPTURE) &&
-        quiet_move != ctx->killers[ply][1] && quiet_move != hash_move) {
+    if (is_quiet(quiet_move) && quiet_move != ctx->killers[ply][1] &&
+        quiet_move != hash_move) {
       hh_update(quiet_move, -bonus, &ctx->board);
     }
   }
@@ -270,7 +270,7 @@ int alpha_beta(search_ctx_t* ctx, uint8_t depth, const uint8_t ply, int alpha,
       }
     }
     if (alpha >= beta) {
-      if (!(get_flags(move) & FLAG_CAPTURE)) {
+      if (is_quiet(move)) {
         update_heuristics(ctx, ply, depth, move, i, &move_list,
                           tt_entry.best_move);
       }

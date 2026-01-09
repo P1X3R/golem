@@ -103,21 +103,24 @@ FORCE_INLINE move_t new_move(const square_t from, const square_t to,
   assert(flags <= 0xF);  // flags should be only 4-bits
   return from | (to << 6) | (flags << 12);
 }
-FORCE_INLINE uint8_t get_from(const move_t move) { return move & 0x3f; }
-FORCE_INLINE uint8_t get_to(const move_t move) { return (move >> 6) & 0x3f; }
+FORCE_INLINE square_t get_from(const move_t move) { return move & 0x3f; }
+FORCE_INLINE square_t get_to(const move_t move) { return (move >> 6) & 0x3f; }
 FORCE_INLINE uint8_t get_flags(const move_t move) { return move >> 12; }
 FORCE_INLINE bool is_castling(const move_t move) {
   return (get_flags(move) & ~1) == 2;
 }
-
-FORCE_INLINE void push_move(move_list_t* move_list, const move_t move) {
-  assert(move_list->len < MAX_MOVES);
-  move_list->moves[move_list->len++] = move;
-}
-
 FORCE_INLINE uint8_t encode_promotion(const piece_t promoted) {
   return FLAG_PROMOTION | (promoted - 1);
 }
 FORCE_INLINE piece_t decode_promotion(const uint8_t flags) {
   return (piece_t)((3 & flags) + 1);
+}
+FORCE_INLINE bool is_quiet(const move_t move) {
+  const uint8_t flags = get_flags(move);
+  return flags == FLAG_QUIET || flags == FLAG_DOUBLE_PUSH;
+}
+
+FORCE_INLINE void push_move(move_list_t* move_list, const move_t move) {
+  assert(move_list->len < MAX_MOVES);
+  move_list->moves[move_list->len++] = move;
 }
