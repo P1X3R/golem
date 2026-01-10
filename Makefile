@@ -1,48 +1,62 @@
-CC := clang
-
-# Build mode (default = release)
-MODE ?= release
+CC       ?= clang
+MODE     ?= release
+DIST     ?= dist
 
 COMMON_FLAGS = -Wall -Wextra -Wpedantic -std=c11
+LDFLAGS      =
 
-ifeq ($(OS),Windows_NT)
-  COMMON_FLAGS +=
+ifeq ($(findstring mingw,$(CC)),mingw)
+    HOST_WIN := 1
+    EXE      := .exe
 else
-  COMMON_FLAGS += -D_POSIX_C_SOURCE=200808L
+    HOST_WIN :=
+    EXE      :=
+    COMMON_FLAGS += -D_POSIX_C_SOURCE=200808L
 endif
 
 ifeq ($(MODE),debug)
     SANITIZERS := address,undefined
-    CFLAGS := $(COMMON_FLAGS) -O1 -g -fsanitize=$(SANITIZERS) -fno-omit-frame-pointer
-    LDFLAGS := -fsanitize=$(SANITIZERS)
+    CFLAGS  := $(COMMON_FLAGS) -O1 -g -fsanitize=$(SANITIZERS) \
+               -fno-omit-frame-pointer
+    LDFLAGS += -fsanitize=$(SANITIZERS)
+
 else ifeq ($(MODE),release)
-    CFLAGS := $(COMMON_FLAGS) -O3 -march=native -DNDEBUG -flto
-    LDFLAGS := -flto
-else ifeq ($(MODE),iccrl)
-    CFLAGS := $(COMMON_FLAGS) -O3 -march=x86-64 -DNDEBUG
-    LDFLAGS := -s
+    CFLAGS  := $(COMMON_FLAGS) -O3 -march=native -DNDEBUG -flto
+    LDFLAGS += -flto
+
+else ifeq ($(MODE),portable)
+    CFLAGS  := $(COMMON_FLAGS) -O3 -march=x86-64 -mtune=generic -DNDEBUG
+    LDFLAGS += -s -static
+    ifeq ($(HOST_WIN),1)
+        LDFLAGS += -static-libgcc -Wl,-Bstatic -lwinpthread -Wl,-Bdynamic
+    endif
 else
-    $(error Unknown MODE '$(MODE)' (expected 'debug' or 'release'))
+    $(error Unknown MODE '$(MODE)' (expected 'debug', 'release', or 'portable'))
 endif
 
-SRC := $(filter-out src/bake.c src/main.c, $(wildcard src/*.c))
+SRC := $(filter-out src/bake.c src/main.c,$(wildcard src/*.c))
 OBJ := $(SRC:.c=.o)
-
-TARGETS := golem bake
 
 all: golem
 
-golem: src/main.o $(OBJ)
+golem$(EXE): src/main.o $(OBJ)
 	$(CC) $^ -o $@ $(LDFLAGS)
 
-bake: src/bake.o $(OBJ)
+bake$(EXE): src/bake.o $(OBJ)
 	$(CC) $^ -o $@ $(LDFLAGS)
 
-# Pattern rule for .c → .o
 src/%.o: src/%.c
 	$(CC) $(CFLAGS) -c $< -o $@
 
 clean:
-	rm -f $(OBJ) src/main.o src/bake.o golem bake
+	rm -f $(OBJ) src/main.o src/bake.o dist/*
 
-.PHONY: all clean golem bake
+export: golem$(EXE)
+	@mkdir -p $(DIST)
+	# determine TARGET_OS and TARGET_ARCH from the compiler
+	$(eval TARGET_OS := $(shell $(CC) -dumpmachine | cut -d- -f3))
+	$(eval TARGET_ARCH := $(shell $(CC) -dumpmachine | cut -d- -f1))
+	mv golem$(EXE) $(DIST)/golem-$(TARGET_OS)-$(TARGET_ARCH)$(EXE)
+	strip $(DIST)/golem-*
+
+.PHONY: all clean export bake golem
