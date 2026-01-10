@@ -37,9 +37,9 @@ endif
 SRC := $(filter-out src/bake.c src/main.c,$(wildcard src/*.c))
 OBJ := $(SRC:.c=.o)
 
-all: golem
+all: zugblitz
 
-golem$(EXE): src/main.o $(OBJ)
+zugblitz$(EXE): src/main.o $(OBJ)
 	$(CC) $^ -o $@ $(LDFLAGS)
 
 bake$(EXE): src/bake.o $(OBJ)
@@ -51,12 +51,12 @@ src/%.o: src/%.c
 clean:
 	rm -f $(OBJ) src/main.o src/bake.o dist/*
 
-export: golem$(EXE)
+export: zugblitz$(EXE)
 	@mkdir -p $(DIST)
 	# determine TARGET_OS and TARGET_ARCH from the compiler
 	$(eval TARGET_OS := $(shell $(CC) -dumpmachine | cut -d- -f3))
 	$(eval TARGET_ARCH := $(shell $(CC) -dumpmachine | cut -d- -f1))
-	mv golem$(EXE) $(DIST)/golem-$(TARGET_OS)-$(TARGET_ARCH)$(EXE)
-	strip $(DIST)/golem-*
+	mv zugblitz$(EXE) $(DIST)/zugblitz-$(TARGET_OS)-$(TARGET_ARCH)$(EXE)
+	strip $(DIST)/zugblitz-*
 
-.PHONY: all clean export bake golem
+.PHONY: all clean export bake zugblitz

@@ -1,6 +1,6 @@
-# Golem
+# Zugblitz
 
-Golem is a UCI-compatible chess engine written in C (because it's simple enough to fit in my brain).
+Zugblitz is a UCI-compatible chess engine written in C (because it's simple enough to fit in my brain).
 
 ## Why?
 
