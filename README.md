@@ -16,10 +16,22 @@ Requirements:
 - C11-compatible compiler (clang is hardcoded in the makefile)
 
 ```sh
-make
+make CC=gcc MODE=release
 ```
 
-That's it.
+This will build a release-optimized binary for your **specific** platform.
+
+> [!WARNING]
+> `debug` mode doesn't work with MinGW due to sanitizers.
+
+## Features
+
+- **Full move generation**: en passant, castling, promotions  
+- **Search algorithms**: Alpha-Beta, PVS, quiescence search, null-move pruning  
+- **Move ordering heuristics**: killer moves, history heuristics  
+- **Evaluation**: incremental midgame/endgame evaluation with PSQTs tuned via Texel’s method  
+- **Optimizations**: transposition tables, Zobrist hashing, LTO for release builds  
 
 ## License
+
 This project is licensed under the MIT License. See the LICENSE file for details.
